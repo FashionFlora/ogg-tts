@@ -240,8 +240,10 @@ def main():
     ap.add_argument("--out", default="out.wav")
     ap.add_argument("--steps", type=int, default=8, help="unmasking iterations per block")
     ap.add_argument("--block", type=int, default=16, help="frames per block (as trained)")
-    ap.add_argument("--cfg", type=float, default=2.0)
+    ap.add_argument("--cfg", type=float, default=3.0)
     ap.add_argument("--temperature", type=float, default=0.8)
+    ap.add_argument("--mtp-temperature", type=float, default=0.8,
+                    help="sampling temperature of the acoustic codes (0 = argmax, which flattens the timbre)")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--sentences", type=int, default=1, help="demo: consecutive sentences per target (<= 25 s)")
     args = ap.parse_args()
@@ -256,7 +258,8 @@ def main():
         path, s, e = args.prompt_tokens.rsplit(":", 2)
         prompt = torch.from_numpy(np.asarray(np.load(path, mmap_mode="r")[:, int(s):int(e)], dtype=np.int64))
     codes = generate(model, tok, prompt, args.prompt_text, args.text, args.lang, block=args.block, steps=args.steps,
-                     cfg=args.cfg, temperature=args.temperature, before=args.before, after=args.after,
+                     cfg=args.cfg, temperature=args.temperature, mtp_temperature=args.mtp_temperature,
+                     before=args.before, after=args.after,
                      speaker=args.speaker, quality=args.quality)
     wav = fc.decode(codec, codes[None].to(args.device))[0].float().cpu().numpy()
     sf.write(args.out, wav, 44100)
