@@ -1,0 +1,94 @@
+{
+ "_doc": "Tag set and rules for the Gemini pass (audio tags + transcript/punctuation check). Every tag goes into the text at the place where it starts: events (vocalizations) where they happen, delivery and emotion before the words they apply to, and again wherever they change. Several tags per sentence and tags of different kinds side by side are allowed, e.g. '[scared] [whispering] Ktos tu jest... [gasping]'.",
+ "inline_tags": {
+  "vocalization": [
+   "[laughing]",
+   "[sighing]",
+   "[gasping]",
+   "[panting]",
+   "[coughing]",
+   "[clears throat]",
+   "[sniffling]",
+   "[scoffing]",
+   "[yawning]",
+   "[humming]"
+  ],
+  "delivery": [
+   "[whispering]",
+   "[softly]",
+   "[voice breaking]",
+   "[singing]",
+   "[pause]",
+   "[slowly]"
+  ],
+  "emotion": [
+   "[angry]",
+   "[frustrated]",
+   "[excited]",
+   "[tired]",
+   "[playful]",
+   "[sad]",
+   "[scared]",
+   "[shouting]"
+  ]
+ },
+ "tag_definitions": {
+  "[pause]": "only a clearly long, dramatic pause inside the speech, noticeably longer than this speaker's normal pauses between sentences; never for ordinary pauses",
+  "[slowly]": "only speech clearly slower than this speaker's normal pace, as a deliberate delivery choice",
+  "[softly]": "clearly quieter, gentle delivery but still voiced (not whispering)",
+  "[whispering]": "unvoiced / whispered speech",
+  "[shouting]": "raised voice, yelling",
+  "[excited]": "high-energy, enthusiastic or thrilled delivery without any aggression; if the delivery is aggressive, hostile or irritated use [angry] instead",
+  "[angry]": "angry, hostile or aggressive delivery, aimed at someone; helpless exasperation without hostility is [frustrated]",
+  "[frustrated]": "frustration, exasperation or desperation: helpless, tense annoyance at a situation ('not again', 'what the hell is going on'), venting or despairing; if it is hostile or aggressive toward someone use [angry]; if it is drained, low-energy resignation without tension use [tired]",
+  "[tired]": "low-energy delivery: tired, weak, drained or bored",
+  "[laughing]": "audible laughter, from a chuckle to loud laughing, also laughter mixed into speech",
+  "[sighing]": "an emotional sigh: a deliberate, clearly audible, voiced and prolonged exhale (about half a second or more) that expresses a feeling (tiredness, relief, resignation, frustration, sadness), done as an act of expression. It is NOT breathing: never tag inhaling, ordinary exhaling, breaths before, after or between words, a breathy or airy voice, panting, short or sharp exhales, or mic/breath noise. If it could just be a breath, do not tag it",
+  "[gasping]": "sudden audible intake of breath (surprise, shock, fear, pain)",
+  "[panting]": "heavy, fast breathing from exertion",
+  "[coughing]": "a cough",
+  "[clears throat]": "throat clearing",
+  "[sniffling]": "sniffing or sniffling, e.g. while crying or with a cold",
+  "[scoffing]": "short dismissive, contemptuous breath or sound",
+  "[yawning]": "a yawn",
+  "[humming]": "humming a tune or a drawn-out 'mm'",
+  "[voice breaking]": "voice cracking or trembling with emotion",
+  "[singing]": "singing instead of speaking",
+  "[playful]": "teasing, joking, light and mischievous delivery",
+  "[sad]": "sadness, grief or sorrow in the voice",
+  "[scared]": "fear or anxiety in the voice"
+ },
+ "excluded": {
+  "sound_effects": "vocals were source-separated, background events are mostly not audible",
+  "character_voices": "[witch voice], [drunken voice], [sleepy drowsy voice]: too rare to learn"
+ },
+ "rules": {
+  "only_when_clearly_audible": true,
+  "max_tags_per_sentence": 4,
+  "emotion_placement": "before the words spoken with that emotion; a new emotion tag where it changes; no tag for neutral speech",
+  "closed_list": "use only the tags above, never invent new ones",
+  "confidence": "every tag gets a confidence 0..1; tags below 0.7 are discarded",
+  "max_adjacent_tags": "at most 2 tags directly next to each other (e.g. '[scared] [whispering] text'); 3 or more in a row is not allowed",
+  "correction_confidence": "change the wording of a sentence only when sure (confidence >= 0.9); if not sure keep the original wording; tags and the spoken-form rewrite are not wording corrections",
+  "audio_evidence_only": "tags come ONLY from what is heard in the audio, never from the text: words in the text that describe a sound or emotion (sighed, laughed, chuckled, whispered, shouted, cried, sang; westchnął, zaśmiała się, szepnął, krzyknął; вздохнула, засмеялся, прошептал) are NOT evidence; a narrator reading 'she sighed' or 'he laughed' usually does not sigh or laugh, so tag it only if the sigh/laugh itself is audible as a sound, and never put a tag right before the word that names it just because of that word. Likewise never infer an emotion from what the sentence says (e.g. 'I hate you' is not [angry] unless the voice itself is angry). When the speaker really performs a quoted line in that manner (e.g. actually whispers the words after 'he whispered,'), tag those words"
+ },
+ "transcript": {
+  "words": "return the original text unchanged unless a word is clearly different, missing or extra in the audio, or unless it must be rewritten to its spoken form (see spoken_form); status ok | corrected | mismatch with confidence; games: words never changed except the spoken_form rewrite",
+  "accept_correction": "only small edits (1-2 words) with confidence >= 0.9; if not sure, leave the original wording; larger edits or mismatch -> sentence dropped; rewriting digits/abbreviations/symbols to spoken form does not count towards this limit",
+  "punctuation": "may add/remove/change , . ? ! ... and dashes inside a sentence and its final mark so they match the speaker's actual pauses and intonation (games included)",
+  "never": [
+   "split or merge sentences",
+   "change letter case (except what the spoken form requires, e.g. a spelled-out abbreviation)",
+   "leave any digit, abbreviation or symbol in the output text"
+  ],
+  "spoken_form": "the transcript must be written exactly as spoken: no digits, no abbreviations, no symbols (%, &, +, =, degree signs, currency signs), no initialisms written as letters, no units or titles in short form (Dr., np., itp., km, kg); everything is spelled out in full words in the form actually heard in the audio, with the correct inflection for the language and context (e.g. 'dwa tysiace dwadziescia cztery', 'dwudziestego czwartego', 'doktor', 'na przyklad'); applies to all sources including games"
+ },
+ "request": "3-4 consecutive sentences of one speaker per request (audio of the span + text of each sentence with its id); the answer maps tags and corrections back to sentence ids, each tag with its position in the sentence text",
+ "tag_frequency_check": "after labelling: tags with fewer than ~200 confident occurrences in the whole dataset are dropped or merged into a close tag before training",
+ "tag_merges": {
+  "[chuckling]": "[laughing]",
+  "[weak]": "[tired]",
+  "[bored]": "[tired]",
+  "[menacing]": "[angry]"
+ }
+}

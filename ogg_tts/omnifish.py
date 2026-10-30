@@ -1,0 +1,256 @@
+"""OmniFish v2: OmniVoice (k2-fsa, Qwen3-0.6B, masked discrete diffusion, bidirectional) predicts the
+Fish Audio Drama 3 / S2 codec's semantic codebook; a small codebook-MTP decoder predicts the 9 residual
+codebooks, chained like Drama 3's audio decoder (layer k sees layer k-1's state and code k, predicts
+code k+1), but ~170M params, trained from scratch, attending over all frames in both directions
+(non-autoregressive: at inference every layer runs on all frames at once).
+
+Block diffusion (as LLaDA2.0 / BD3-LM): the target is generated in blocks of frames, left to right; inside
+a block, masked iterative unmasking. Training sequence:
+  [<|lang_start|>pl<|lang_end|><|instruct_start|>None<|instruct_end|>] [<|text_start|>text<|text_end|>]
+  [prompt frames] [clean target blocks] [noisy target blocks]
+attention (see block_attention): context (text + prompt) sees only context; clean block b sees context and
+clean blocks <= b; noisy block b sees context, clean blocks < b and itself. Noisy blocks share the positions
+of their clean copies. Length is the model's own call (Rainbow Padding): the speech is followed by one
+END frame and the PAD_IDS cycle up to the block boundary; generation stops at the block holding END.
+Audio frame inputs (all 10 codebook embeddings summed): prompt frames carry their 10 true codes; target
+frames carry only the semantic id (or MASK_ID) and MASK_ID for codebooks 1..9 - the same at training and
+inference. Losses: semantic CE on masked noisy frames (END/PAD included) + residual CE on the clean copy's
+speech frames, the MTP attending block-causally over frames.
+"""
+import glob
+import json
+import math
+import os
+
+import torch
+import torch.nn.functional as F
+from torch import nn
+
+OMNIVOICE_PATH = glob.glob("/data/dataset/train/hf/models--k2-fsa--OmniVoice/snapshots/*")[0]
+CODEBOOK_SIZES = [4096] + [1024] * 9
+NUM_CODEBOOKS = len(CODEBOOK_SIZES)
+MASK_ID = max(CODEBOOK_SIZES)          # 4096, shared input mask id for every codebook
+END_ID = MASK_ID + 1                   # 4097, semantic id of the frame after the speech
+PAD_IDS = list(range(END_ID + 1, END_ID + 8))  # 4098..4104, Rainbow Padding cycle after END
+VOCAB = PAD_IDS[-1] + 1                # 4105: per-codebook input embedding width, semantic head width
+OLD_VOCAB = MASK_ID + 1                # checkpoints before block diffusion (no END/PAD)
+RESIDUAL_WEIGHTS = [8, 6, 6, 4, 4, 3, 2, 2, 2]
+
+
+def rotary(x, positions, base=10000.0):
+    """x [B, H, T, D], positions [B, T]: rotate-half RoPE"""
+    d = x.shape[-1]
+    inv = base ** (-torch.arange(0, d, 2, device=x.device, dtype=torch.float32) / d)
+    ang = positions.float()[:, None, :, None] * inv
+    cos, sin = ang.cos(), ang.sin()
+    x1, x2 = x[..., : d // 2].float(), x[..., d // 2:].float()
+    return torch.cat((x1 * cos - x2 * sin, x2 * cos + x1 * sin), -1).to(x.dtype)
+
+
+def context_text(text, before=(), after=()):
+    """<|object_ref_start|>before<|object_ref_end|><|text_start|>text<|text_end|><|box_start|>after<|box_end|>"""
+    b = f"<|object_ref_start|>{' '.join(before)}<|object_ref_end|>" if before else ""
+    a = f"<|box_start|>{' '.join(after)}<|box_end|>" if after else ""
+    return f"{b}<|text_start|>{text}<|text_end|>{a}"
+
+
+def dialogue_text(turns):
+    """[(speaker token, line), ...] -> "<|quad_start|>pl_3<|quad_end|>line line <|quad_start|>pl_7<|quad_end|>line";
+    a marker only where the speaker changes"""
+    out, last = [], None
+    for spk, line in turns:
+        out.append(line if spk == last else f"<|quad_start|>{spk}<|quad_end|>{line}")
+        last = spk
+    return " ".join(out)
+
+
+def block_attention(kind, block):
+    """kind [B, L] (0 context, 1 clean target, 2 noisy target, -1 padding), block [B, L] -> [B, 1, L, L]:
+    context sees context; clean block b sees context and clean blocks <= b; noisy block b sees context,
+    clean blocks < b and itself; padding rows see every real position (no empty row)"""
+    kq, kk, bq, bk = kind[:, :, None], kind[:, None, :], block[:, :, None], block[:, None, :]
+    att = ((kk == 0) & (kq >= 0)) | ((kq == 1) & (kk == 1) & (bk <= bq)) \
+        | ((kq == 2) & (kk == 1) & (bk < bq)) | ((kq == 2) & (kk == 2) & (bk == bq)) | ((kq == -1) & (kk >= 0))
+    return att[:, None]
+
+
+class MTPLayer(nn.Module):
+    """Mix code k's embedding into the running state, one bidirectional transformer block over frames,
+    predict code k+1."""
+
+    def __init__(self, dim, vocab_in, vocab_out, n_head=8, n_kv=2, head_dim=128, ffn=3584, eps=1e-6, causal=False):
+        super().__init__()
+        self.n_head, self.n_kv, self.head_dim, self.causal = n_head, n_kv, head_dim, causal
+        self.embedding = nn.Embedding(vocab_in, dim)
+        self.enorm, self.hnorm = nn.RMSNorm(dim, eps=eps), nn.RMSNorm(dim, eps=eps)
+        self.eh_proj = nn.Linear(2 * dim, dim, bias=False)
+        self.attn_norm, self.ffn_norm = nn.RMSNorm(dim, eps=eps), nn.RMSNorm(dim, eps=eps)
+        self.wq = nn.Linear(dim, n_head * head_dim, bias=False)
+        self.wkv = nn.Linear(dim, 2 * n_kv * head_dim, bias=False)
+        self.wo = nn.Linear(n_head * head_dim, dim, bias=False)
+        self.w1, self.w3 = nn.Linear(dim, ffn, bias=False), nn.Linear(dim, ffn, bias=False)
+        self.w2 = nn.Linear(ffn, dim, bias=False)
+        self.out_norm = nn.RMSNorm(dim, eps=eps)
+        self.head = nn.Linear(dim, vocab_out, bias=False)
+
+    def forward(self, h, codes, positions, valid, attn=None):
+        """h [B, T, dim], codes [B, T], positions [B, T], valid [B, T], attn [B, 1, T, T] (optional, overrides
+        valid/causal) -> (state, logits [B, T, vocab_out])"""
+        x = self.eh_proj(torch.cat((self.enorm(self.embedding(codes)), self.hnorm(h)), -1))
+        B, T, _ = x.shape
+        a = self.attn_norm(x)
+        q = self.wq(a).view(B, T, self.n_head, self.head_dim).transpose(1, 2)
+        k, v = self.wkv(a).view(B, T, 2, self.n_kv, self.head_dim).permute(2, 0, 3, 1, 4)
+        q, k = rotary(q, positions), rotary(k, positions)
+        rep = self.n_head // self.n_kv
+        k, v = k.repeat_interleave(rep, 1), v.repeat_interleave(rep, 1)
+        mask = valid[:, None, None, :] if attn is None else attn
+        if attn is None and self.causal:  # autoregressive models: a frame sees only earlier frames
+            mask = mask & torch.ones(T, T, dtype=torch.bool, device=x.device).tril()
+        o = F.scaled_dot_product_attention(q, k, v, attn_mask=mask)
+        x = x + self.wo(o.transpose(1, 2).reshape(B, T, -1))
+        x = x + self.w2(F.silu(self.w1(self.ffn_norm(x))) * self.w3(self.ffn_norm(x)))
+        x = self.out_norm(x)
+        return x, self.head(x)
+
+
+class MTPDecoder(nn.Module):
+    """codebooks 1..9 from the backbone state and the semantic codes: layer k embeds code k, predicts k+1"""
+
+    def __init__(self, dim=1024, causal=False):
+        super().__init__()
+        self.layers = nn.ModuleList(MTPLayer(dim, CODEBOOK_SIZES[k], CODEBOOK_SIZES[k + 1], causal=causal)
+                                    for k in range(NUM_CODEBOOKS - 1))
+
+    def forward(self, h, codes, positions, valid, attn=None):
+        """teacher forcing: codes [B, 10, T] true codes -> list of 9 logits [B, T, 1024] (codebooks 1..9)"""
+        out = []
+        for k, layer in enumerate(self.layers):
+            h, logits = layer(h, codes[:, k], positions, valid, attn)
+            out.append(logits)
+        return out
+
+    @torch.no_grad()
+    def generate(self, h, semantic, positions, valid, temperature=0.0, attn=None):
+        """semantic [B, T] -> codes [B, 10, T]; every layer on all frames at once"""
+        codes = [semantic]
+        for layer in self.layers:
+            h, logits = layer(h, codes[-1], positions, valid, attn)
+            if temperature > 0:
+                nxt = torch.distributions.Categorical(logits=logits.float() / temperature).sample()
+            else:
+                nxt = logits.argmax(-1)
+            codes.append(nxt)
+        return torch.stack(codes, 1)
+
+
+class OmniFish(nn.Module):
+    def __init__(self, llm):
+        super().__init__()
+        self.llm = llm
+        dim = llm.config.hidden_size
+        self.audio_embeddings = nn.Embedding(NUM_CODEBOOKS * VOCAB, dim)
+        self.semantic_head = nn.Linear(dim, VOCAB, bias=False)  # semantic codes, MASK (never a target), END, PADs
+        self.mtp = MTPDecoder(dim)
+        std = float(llm.get_input_embeddings().weight.detach().std())
+        nn.init.normal_(self.audio_embeddings.weight, std=std)
+        nn.init.normal_(self.semantic_head.weight, std=1e-3)  # start from ~uniform semantic logits
+        for layer in self.mtp.layers:
+            nn.init.normal_(layer.head.weight, std=1e-3)
+        self.register_buffer("codebook_offsets", torch.arange(NUM_CODEBOOKS) * VOCAB, persistent=False)
+        w = torch.tensor(RESIDUAL_WEIGHTS, dtype=torch.float)
+        self.register_buffer("residual_weights", w / w.sum(), persistent=False)
+
+    @classmethod
+    def from_omnivoice(cls, path=OMNIVOICE_PATH, dtype=torch.float32, attn="sdpa"):
+        from safetensors.torch import load_file
+        from transformers import AutoModel, AutoTokenizer, Qwen3Config
+
+        cfg = json.load(open(os.path.join(path, "config.json")))
+        llm_cfg = Qwen3Config(**{k: v for k, v in cfg["llm_config"].items() if k != "model_type"})
+        llm_cfg._attn_implementation = attn
+        llm = AutoModel.from_config(llm_cfg, dtype=dtype)
+        state = load_file(os.path.join(path, "model.safetensors"))
+        missing, _ = llm.load_state_dict({k[4:]: v for k, v in state.items() if k.startswith("llm.")}, strict=False)
+        if missing:
+            raise RuntimeError(f"backbone weights missing: {missing[:5]}")
+        return cls(llm).to(dtype), AutoTokenizer.from_pretrained(path)
+
+    def embed(self, input_ids, audio_mask):
+        """input_ids [B, 10, L] (text ids repeated on every channel), audio_mask [B, L] -> [B, L, H]"""
+        text = self.llm.get_input_embeddings()(input_ids[:, 0])
+        shifted = input_ids * audio_mask[:, None] + self.codebook_offsets.view(1, -1, 1)
+        return torch.where(audio_mask[..., None], self.audio_embeddings(shifted).sum(1), text)
+
+    def backbone(self, input_ids, audio_mask, attention_mask, position_ids):
+        return self.llm(inputs_embeds=self.embed(input_ids, audio_mask), attention_mask=attention_mask,
+                        position_ids=position_ids, return_dict=True)[0]
+
+    @staticmethod
+    def upgrade_state(state):
+        """weights saved before END/PAD (input/semantic vocab 4097/4096) -> current shapes; new rows freshly
+        initialised. Optimizer moments for those two tensors are remapped the same way (zeros for new rows)."""
+        out = dict(state)
+        emb = state["audio_embeddings.weight"]
+        if emb.shape[0] == NUM_CODEBOOKS * VOCAB:
+            return out
+        dim = emb.shape[1]
+        new = torch.randn(NUM_CODEBOOKS, VOCAB, dim, dtype=emb.dtype) * emb.std()
+        new[:, :OLD_VOCAB] = emb.view(NUM_CODEBOOKS, OLD_VOCAB, dim)
+        out["audio_embeddings.weight"] = new.view(-1, dim)
+        head = state["semantic_head.weight"]
+        newh = torch.randn(VOCAB, dim, dtype=head.dtype) * 1e-3
+        newh[:head.shape[0]] = head
+        out["semantic_head.weight"] = newh
+        return out
+
+    @staticmethod
+    def upgrade_moment(name, t):
+        """an AdamW moment of an old-shape parameter -> current shape, zeros for the new rows"""
+        if t.dim() < 2:  # norms, biases: never reshaped
+            return t
+        dim = t.shape[1]
+        if name == "audio_embeddings.weight" and t.shape[0] != NUM_CODEBOOKS * VOCAB:
+            new = torch.zeros(NUM_CODEBOOKS, VOCAB, dim, dtype=t.dtype)
+            new[:, :OLD_VOCAB] = t.view(NUM_CODEBOOKS, OLD_VOCAB, dim)
+            return new.view(-1, dim)
+        if name == "semantic_head.weight" and t.shape[0] != VOCAB:
+            new = torch.zeros(VOCAB, dim, dtype=t.dtype)
+            new[:t.shape[0]] = t
+            return new
+        return t
+
+    @staticmethod
+    def gather_targets(h, codes, target_mask):
+        """target frames of every row, left-aligned: h [B, T, H], codes [B, 10, T], positions, valid [B, T]"""
+        B = h.shape[0]
+        n = target_mask.sum(1)
+        T = int(n.max())
+        order = torch.argsort((~target_mask).to(torch.int8), dim=1, stable=True)[:, :T]  # target positions first
+        valid = torch.arange(T, device=h.device)[None] < n[:, None]
+        ht = h.gather(1, order[..., None].expand(B, T, h.shape[-1]))
+        ct = codes.gather(2, order[:, None].expand(B, codes.shape[1], T))
+        positions = torch.arange(T, device=h.device)[None].expand(B, T)
+        return ht, ct, positions, valid, order
+
+    @staticmethod
+    def frame_attention(block, valid):
+        """MTP mask over frames: frame i sees valid frame j iff block_j <= block_i -> [B, 1, T, T] (padding rows
+        see the valid frames too, so no row is empty)"""
+        return ((block[:, None, :, None] >= block[:, None, None, :]) | ~valid[:, None, :, None]) & valid[:, None, None, :]
+
+    def forward(self, input_ids, audio_mask, attention_mask, position_ids, semantic_labels, codes, target_mask,
+                target_block):
+        """semantic_labels [B, L] (-100 except masked noisy frames), codes [B, 10, L] true codes, target_mask
+        [B, L] speech frames of the clean copy (MTP targets), target_block [B, L] their block index"""
+        h = self.backbone(input_ids, audio_mask, attention_mask, position_ids)
+        sem_logits = self.semantic_head(h)
+        sem_loss = F.cross_entropy(sem_logits.float().flatten(0, 1), semantic_labels.flatten(), ignore_index=-100)
+        ht, ct, pos, valid, order = self.gather_targets(h, codes, target_mask)
+        attn = self.frame_attention(target_block.gather(1, order), valid)
+        res = []
+        for k, logits in enumerate(self.mtp(ht, ct, pos, valid, attn)):
+            res.append(F.cross_entropy(logits.float()[valid], ct[:, k + 1][valid]))
+        res = torch.stack(res)
+        loss = sem_loss + (res * self.residual_weights).sum()
+        return {"loss": loss, "semantic": sem_loss.detach(), "residual": res.detach()}

@@ -1,0 +1,16 @@
+OGG TTS
+Copyright 2026 FashionFlora
+
+The OGG TTS code in this repository (ogg_tts/, data_prep/, run_train.sh, configs/) is licensed under the
+Apache License, Version 2.0 (see LICENSE).
+
+Built with Fish Audio.
+This project uses the Fish Audio Drama 3 / S2 audio codec and the fish-speech software, which are not included
+in this repository and are licensed separately:
+"These Fish Audio Materials are licensed under the Fish Audio Community License, Version 1.0.
+Copyright © 39 AI, INC. All Rights Reserved." (see LICENSE-FISH-AUDIO.md)
+OGG TTS model weights are trained on tokens produced by the Fish Audio codec and need that codec to produce
+audio; their use is subject to the Fish Audio Community License, including its restrictions on voice cloning of
+real people without consent.
+
+The backbone is initialised from OmniVoice (k2-fsa), see its own license.
