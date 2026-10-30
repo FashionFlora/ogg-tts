@@ -6,6 +6,7 @@ OGG TTS is named after the trolls of *The Witcher*. Its planned siblings are **R
 architectures compared in the technical report. Like its namesakes, OGG talks a lot.
 
 - Model weights and model card: https://huggingface.co/FashionFlora/ogg-tts (published at checkpoint 20k).
+- Playground: https://huggingface.co/spaces/FashionFlora/ogg-tts
 - Status: pre-training in progress (400k steps planned).
 
 Built with Fish Audio.
@@ -83,6 +84,7 @@ run_train.sh          the training command used for v0
 
 **Setup:**
 - The scripts expect the original paths of the training machine (`/data/dataset/...`). Adjust them for your setup.
+  For inference, `OMNIVOICE_PATH` and `FISH_CODEC_PATH` can point to downloaded `k2-fsa/OmniVoice` and `fishaudio/drama-3/codec.pth`.
 - Fish Audio codec code goes in `ogg_tts/fish-speech`:
   ```
   git clone https://github.com/fishaudio/fish-speech ogg_tts/fish-speech

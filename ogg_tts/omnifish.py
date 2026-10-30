@@ -26,7 +26,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-OMNIVOICE_PATH = glob.glob("/data/dataset/train/hf/models--k2-fsa--OmniVoice/snapshots/*")[0]
+# OmniVoice weights: $OMNIVOICE_PATH, else the local HF cache of the training machine
+OMNIVOICE_PATH = os.environ.get("OMNIVOICE_PATH") or next(iter(glob.glob("/data/dataset/train/hf/models--k2-fsa--OmniVoice/snapshots/*")), None)
 CODEBOOK_SIZES = [4096] + [1024] * 9
 NUM_CODEBOOKS = len(CODEBOOK_SIZES)
 MASK_ID = max(CODEBOOK_SIZES)          # 4096, shared input mask id for every codebook

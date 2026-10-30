@@ -8,7 +8,8 @@ import torch
 
 FISH_SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fish-speech")
 sys.path.insert(0, FISH_SRC)
-CODEC_PATH = glob.glob("/data/dataset/train/hf/models--fishaudio--drama-3/snapshots/*/codec.pth")[0]
+# codec weights: $FISH_CODEC_PATH, else the local HF cache of the training machine
+CODEC_PATH = os.environ.get("FISH_CODEC_PATH") or next(iter(glob.glob("/data/dataset/train/hf/models--fishaudio--drama-3/snapshots/*/codec.pth")), None)
 
 SAMPLE_RATE = 44100
 HOP = 2048
