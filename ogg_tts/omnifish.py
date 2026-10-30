@@ -14,8 +14,9 @@ of their clean copies. Length is the model's own call (Rainbow Padding): the spe
 END frame and the PAD_IDS cycle up to the block boundary; generation stops at the block holding END.
 Audio frame inputs (all 10 codebook embeddings summed): prompt frames carry their 10 true codes; target
 frames carry only the semantic id (or MASK_ID) and MASK_ID for codebooks 1..9 - the same at training and
-inference. Losses: semantic CE on masked noisy frames (END/PAD included) + residual CE on the clean copy's
-speech frames, the MTP attending block-causally over frames.
+inference. Losses: semantic CE on masked noisy frames (END/PAD included) + residual CE of the MTP, trained as masked
+prediction over frames (see mtp_unmask_loss): it decodes a block codebook by codebook, unmasking the frames of
+each codebook in a few rounds while seeing every decided code of the earlier blocks.
 """
 import glob
 import json
@@ -76,13 +77,15 @@ def block_attention(kind, block):
 
 
 class MTPLayer(nn.Module):
-    """Mix code k's embedding into the running state, one bidirectional transformer block over frames,
-    predict code k+1."""
+    """Mix code k's embedding (and the already decided code k+1 of other frames, MASK where not decided) into the
+    running state, one bidirectional transformer block over frames, predict code k+1."""
 
     def __init__(self, dim, vocab_in, vocab_out, n_head=8, n_kv=2, head_dim=128, ffn=3584, eps=1e-6, causal=False):
         super().__init__()
         self.n_head, self.n_kv, self.head_dim, self.causal = n_head, n_kv, head_dim, causal
         self.embedding = nn.Embedding(vocab_in, dim)
+        self.revealed = nn.Embedding(vocab_out + 1, dim)  # code k+1 where already decided; index vocab_out = MASK
+        self.mask_id = vocab_out
         self.enorm, self.hnorm = nn.RMSNorm(dim, eps=eps), nn.RMSNorm(dim, eps=eps)
         self.eh_proj = nn.Linear(2 * dim, dim, bias=False)
         self.attn_norm, self.ffn_norm = nn.RMSNorm(dim, eps=eps), nn.RMSNorm(dim, eps=eps)
@@ -94,10 +97,13 @@ class MTPLayer(nn.Module):
         self.out_norm = nn.RMSNorm(dim, eps=eps)
         self.head = nn.Linear(dim, vocab_out, bias=False)
 
-    def forward(self, h, codes, positions, valid, attn=None):
+    def forward(self, h, codes, positions, valid, attn=None, revealed=None):
         """h [B, T, dim], codes [B, T], positions [B, T], valid [B, T], attn [B, 1, T, T] (optional, overrides
-        valid/causal) -> (state, logits [B, T, vocab_out])"""
-        x = self.eh_proj(torch.cat((self.enorm(self.embedding(codes)), self.hnorm(h)), -1))
+        valid/causal), revealed [B, T] code k+1 or mask_id (None: all masked) -> (state, logits [B, T, vocab_out])"""
+        if revealed is None:
+            revealed = torch.full_like(codes, self.mask_id)
+        e = self.embedding(codes) + self.revealed(revealed)
+        x = self.eh_proj(torch.cat((self.enorm(e), self.hnorm(h)), -1))
         B, T, _ = x.shape
         a = self.attn_norm(x)
         q = self.wq(a).view(B, T, self.n_head, self.head_dim).transpose(1, 2)
@@ -132,22 +138,55 @@ class MTPDecoder(nn.Module):
         return out
 
     @torch.no_grad()
-    def generate(self, h, semantic, positions, valid, temperature=0.0, attn=None, top_k=0, sample_layers=None):
-        """semantic [B, T] -> codes [B, 10, T]; every layer on all frames at once. All frames of a codebook are drawn
-        at once and independently, so sampling (temperature > 0) can make neighbouring frames disagree: top_k keeps
-        only the k most likely codes, sample_layers samples only the first n residual codebooks (argmax for the rest)"""
-        codes = [semantic]
-        for k, layer in enumerate(self.layers):
-            h, logits = layer(h, codes[-1], positions, valid, attn)
-            if temperature > 0 and (sample_layers is None or k < sample_layers):
-                lg = logits.float() / temperature
-                if top_k > 0:
-                    lg = lg.masked_fill(lg < lg.topk(top_k, -1).values[..., -1:], -float("inf"))
-                nxt = torch.distributions.Categorical(logits=lg).sample()
-            else:
-                nxt = logits.argmax(-1)
-            codes.append(nxt)
-        return torch.stack(codes, 1)
+    def generate(self, h, semantic, block, rounds=4, temperature=0.0, top_k=0):
+        """semantic [T] codes of one utterance, h [T, dim] its backbone states -> codes [10, T]. Block by block (frames
+        of `block`), codebook by codebook; inside a block the frames of a codebook are unmasked over `rounds`
+        iterations (most confident first, cosine schedule), each seeing the decided codes of the earlier blocks and
+        of the frames revealed so far. Layer k's input state of a block is layer k-1's clean pass (all decided)."""
+        T, dev = semantic.shape[0], semantic.device
+        codes = torch.zeros(NUM_CODEBOOKS, T, dtype=torch.long, device=dev)
+        codes[0] = semantic
+        blk = torch.arange(T, device=dev) // block
+        states = [h[None]] + [None] * len(self.layers)  # clean input state of layer k for every decided frame
+        pos_all = torch.arange(T, device=dev)[None]
+        for b in range(int(blk[-1]) + 1 if T else 0):
+            lo, hi = b * block, min(T, (b + 1) * block)
+            for k, layer in enumerate(self.layers):
+                hk = states[k][:, :hi]
+                cur = torch.full((hi - lo,), layer.mask_id, dtype=torch.long, device=dev)
+                # context: decided frames of earlier blocks (block-causal among themselves) + the current block
+                L = lo + (hi - lo)
+                kind = torch.cat([torch.zeros(lo, dtype=torch.long, device=dev), torch.ones(hi - lo, dtype=torch.long, device=dev)])
+                bb = blk[:hi]
+                attn = ((bb[None, :, None] >= bb[None, None, :]) & (kind[None, None, :] == 0)) | \
+                       ((kind[None, :, None] == 1) & (kind[None, None, :] == 1))
+                attn = attn[:, None]
+                for r in range(rounds):
+                    rev = torch.cat([codes[k + 1, :lo], cur])[None]
+                    _, logits = layer(hk, codes[k, :hi][None], pos_all[:, :hi], None, attn, rev)
+                    lg = logits[0, lo:hi].float()
+                    masked = cur == layer.mask_id
+                    probs = F.softmax(lg / max(temperature, 1e-5), -1)
+                    if temperature > 0:
+                        if top_k > 0:
+                            lg = lg.masked_fill(lg < lg.topk(top_k, -1).values[..., -1:], -float("inf"))
+                        sample = torch.distributions.Categorical(logits=lg / temperature).sample()
+                    else:
+                        sample = lg.argmax(-1)
+                    conf = torch.where(masked, probs.gather(1, sample[:, None])[:, 0], torch.full_like(probs[:, 0], -1.0))
+                    keep = int(math.floor((hi - lo) * math.cos(math.pi / 2 * (r + 1) / rounds)))
+                    n_fix = int(masked.sum()) - keep
+                    if n_fix > 0:
+                        idx = conf.topk(n_fix).indices
+                        cur[idx] = sample[idx]
+                codes[k + 1, lo:hi] = cur
+                # clean pass of the decided frames: next layer's input state (earlier blocks are recomputed alike)
+                cattn = (bb[None, :, None] >= bb[None, None, :])[:, None]
+                st, _ = layer(hk, codes[k, :hi][None], pos_all[:, :hi], None, cattn, codes[k + 1, :hi][None])
+                if states[k + 1] is None:
+                    states[k + 1] = torch.zeros(1, T, st.shape[-1], dtype=st.dtype, device=dev)
+                states[k + 1][:, lo:hi] = st[:, lo:hi]
+        return codes
 
 
 class OmniFish(nn.Module):
@@ -239,6 +278,34 @@ class OmniFish(nn.Module):
         positions = torch.arange(T, device=h.device)[None].expand(B, T)
         return ht, ct, positions, valid, order
 
+    def mtp_unmask_loss(self, ht, ct, pos, valid, block):
+        """MTP as masked prediction over frames: per layer, every block masks code k+1 of its frames at its own
+        uniform random ratio; [clean frames | noisy frames]: clean frame i sees clean frames of blocks <= its block;
+        noisy frame i sees clean frames of earlier blocks and noisy frames of its own block. Loss on masked noisy
+        frames. -> 9 losses"""
+        B, T = valid.shape
+        kind = torch.cat([torch.zeros(B, T, dtype=torch.long, device=ht.device), torch.ones(B, T, dtype=torch.long, device=ht.device)], 1)
+        bb = torch.cat([block, block], 1)
+        v2 = torch.cat([valid, valid], 1)
+        kq, kk, bq, bk = kind[:, :, None], kind[:, None, :], bb[:, :, None], bb[:, None, :]
+        attn = ((kq == 0) & (kk == 0) & (bk <= bq)) | ((kq == 1) & (kk == 0) & (bk < bq)) | ((kq == 1) & (kk == 1) & (bk == bq))
+        attn = (attn | ~v2[:, :, None]) & v2[:, None, :]  # padding rows see the valid frames (no empty row)
+        attn = attn | torch.eye(2 * T, dtype=torch.bool, device=ht.device)[None]  # a row always sees itself
+        attn = attn[:, None]
+        pos2 = torch.cat([pos, pos], 1)
+        nb = int(block.max()) + 1
+        state, res = ht, []
+        for k, layer in enumerate(self.mtp.layers):
+            ratio = torch.rand(B, nb, device=ht.device)
+            m = (torch.rand(B, T, device=ht.device) < ratio.gather(1, block)) & valid
+            m[:, 0] |= valid[:, 0] & ~m.any(1)  # at least one masked frame per row
+            tgt = ct[:, k + 1]
+            rev = torch.cat([tgt, torch.where(m, torch.full_like(tgt, layer.mask_id), tgt)], 1)
+            st, logits = layer(torch.cat([state, state], 1), torch.cat([ct[:, k], ct[:, k]], 1), pos2, v2, attn, rev)
+            res.append(F.cross_entropy(logits[:, T:].float()[m], tgt[m]))
+            state = st[:, :T]
+        return torch.stack(res)
+
     @staticmethod
     def frame_attention(block, valid):
         """MTP mask over frames: frame i sees valid frame j iff block_j <= block_i -> [B, 1, T, T] (padding rows
@@ -253,10 +320,6 @@ class OmniFish(nn.Module):
         sem_logits = self.semantic_head(h)
         sem_loss = F.cross_entropy(sem_logits.float().flatten(0, 1), semantic_labels.flatten(), ignore_index=-100)
         ht, ct, pos, valid, order = self.gather_targets(h, codes, target_mask)
-        attn = self.frame_attention(target_block.gather(1, order), valid)
-        res = []
-        for k, logits in enumerate(self.mtp(ht, ct, pos, valid, attn)):
-            res.append(F.cross_entropy(logits.float()[valid], ct[:, k + 1][valid]))
-        res = torch.stack(res)
+        res = self.mtp_unmask_loss(ht, ct, pos, valid, target_block.gather(1, order))
         loss = sem_loss + (res * self.residual_weights).sum()
         return {"loss": loss, "semantic": sem_loss.detach(), "residual": res.detach()}

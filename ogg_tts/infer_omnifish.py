@@ -207,7 +207,7 @@ def semantic_blocks_cached(model, tok, prompt_codes, prompt_text, text, lang, bl
 
 @torch.no_grad()
 def generate_cached(model, tok, prompt_codes, prompt_text, text, lang, block=16, steps=6, cfg=2.0, temperature=0.8,
-                    mtp_temperature=0.5, mtp_top_k=3, mtp_sample_layers=3, max_frames=None, seed=0, before=(), after=(), speaker=None, quality=None):
+                    mtp_temperature=0.0, mtp_top_k=0, mtp_rounds=4, max_frames=None, seed=0, before=(), after=(), speaker=None, quality=None):
     """generate() with KV caches: whole utterance -> codes [10, frames]"""
     for clean, h in semantic_blocks_cached(model, tok, prompt_codes, prompt_text, text, lang, block, steps, cfg,
                                            temperature, max_frames, seed, before, after, speaker, quality):
@@ -216,13 +216,10 @@ def generate_cached(model, tok, prompt_codes, prompt_text, text, lang, block=16,
     dev = clean.device
     if n == 0:
         return torch.zeros(of.NUM_CODEBOOKS, 0, dtype=torch.long, device=dev)
-    fpos = torch.arange(n, device=dev)[None]
-    valid = torch.ones(1, n, dtype=torch.bool, device=dev)
-    attn = model.frame_attention(fpos // block, valid)
     with torch.autocast(dev.type, torch.bfloat16):
         dtype = next(model.mtp.parameters()).dtype  # fp32 or bf16 weights
-        return model.mtp.generate(h[:n].to(dtype)[None], clean[None, :n], fpos, valid, temperature=mtp_temperature,
-                                  attn=attn, top_k=mtp_top_k, sample_layers=mtp_sample_layers)[0]
+        return model.mtp.generate(h[:n].to(dtype), clean[:n], block, rounds=mtp_rounds, temperature=mtp_temperature,
+                                  top_k=mtp_top_k)
 
 
 def speech_frames(clean):
@@ -240,12 +237,10 @@ def residuals(model, prefix, prompt_codes, clean, n, block, mtp_temperature=0.0)
     ids, am, att, pos, cs, _ = sequence(prefix, prompt_codes, clean, clean[:0], block)
     with torch.autocast(dev.type, torch.bfloat16):
         h = model.backbone(ids, am, att, pos)
-    ht = h[:, cs][:, :n].float()
-    fpos = torch.arange(n, device=dev)[None]
-    valid = torch.ones(1, n, dtype=torch.bool, device=dev)
-    attn = model.frame_attention(fpos // block, valid)
+    ht = h[0, cs][:n]
     with torch.autocast(dev.type, torch.bfloat16):
-        return model.mtp.generate(ht, clean[None, :n], fpos, valid, temperature=mtp_temperature, attn=attn)[0]
+        return model.mtp.generate(ht.to(next(model.mtp.parameters()).dtype), clean[:n], block,
+                                  temperature=mtp_temperature)
 
 
 @torch.no_grad()
@@ -364,10 +359,9 @@ def main():
     ap.add_argument("--block", type=int, default=16, help="frames per block (as trained)")
     ap.add_argument("--cfg", type=float, default=2.0)
     ap.add_argument("--temperature", type=float, default=0.8)
-    ap.add_argument("--mtp-temperature", type=float, default=0.5,
-                    help="sampling temperature of the acoustic codes (0 = argmax)")
-    ap.add_argument("--mtp-top-k", type=int, default=3, help="acoustic codes sampled among the k most likely")
-    ap.add_argument("--mtp-sample-layers", type=int, default=3, help="sample only the first n residual codebooks, argmax the rest")
+    ap.add_argument("--mtp-temperature", type=float, default=0.0, help="sampling temperature of the acoustic codes (0 = argmax)")
+    ap.add_argument("--mtp-top-k", type=int, default=0, help="acoustic codes sampled among the k most likely (0 = all)")
+    ap.add_argument("--mtp-rounds", type=int, default=4, help="unmasking rounds per codebook and block")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--sentences", type=int, default=1, help="demo: consecutive sentences per target (<= 25 s)")
     args = ap.parse_args()
@@ -381,7 +375,7 @@ def main():
     if args.prompt_tokens:
         path, s, e = args.prompt_tokens.rsplit(":", 2)
         prompt = torch.from_numpy(np.asarray(np.load(path, mmap_mode="r")[:, int(s):int(e)], dtype=np.int64))
-    extra = {} if args.no_cache else dict(mtp_top_k=args.mtp_top_k, mtp_sample_layers=args.mtp_sample_layers)
+    extra = {} if args.no_cache else dict(mtp_top_k=args.mtp_top_k, mtp_rounds=args.mtp_rounds)
     gen = generate if args.no_cache else generate_cached
     codes = gen(model, tok, prompt, args.prompt_text, args.text, args.lang, block=args.block, steps=args.steps,
                      cfg=args.cfg, temperature=args.temperature, mtp_temperature=args.mtp_temperature,
