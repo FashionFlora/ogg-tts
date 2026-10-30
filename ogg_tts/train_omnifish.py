@@ -2,8 +2,8 @@
 """Train OmniFish (OmniVoice backbone + Fish codec tokens) on /data/dataset/tokens_fish.
 
 OmniFish v2 (semantic predictor + MTP decoder, see omnifish.py). Samples: audiobooks - 1..--max-sentences successive
-kept sentences of one speaker in one book (other speakers' lines in between are skipped), spliced from the book's
-continuous token stream: each sentence with the plain pause that follows it in the book
+kept sentences of one speaker in one book that follow each other directly (another speaker's line ends the window,
+nothing is skipped), cut from the book's continuous token stream: each sentence with the plain pause that follows it in the book
 (/data/dataset/build/sentence_pauses.parquet), at most --max-pause seconds (a longer pause loses its middle, both
 edges stay), the last one without; up to --max-seconds.
 Music, effects and other untranscribed audio never enter a span. Games - single lines.
@@ -139,15 +139,18 @@ def splice(rows):
 def build_spans(idx, max_sentences, max_frames, max_gap, max_skip, seed=0, dialogue=0.0, dialogue_prompt=0.0):
     """(tokens file, ((start, end), ...) frame segments, text, lang, global speaker, (2 sentences before, 2 after))
     for spans of 1..max_sentences kept
-    sentences of one speaker; every segment but the last carries the sentence's own following pause (<= max_gap);
-    successive sentences lie at most max_skip frames apart in the book (other speakers' lines in between).
+    sentences of one speaker that follow each other directly in the book (a line of another speaker, or a dropped
+    line, ends the window: nothing is skipped, the audio stays continuous); every segment but the last carries the
+    sentence's own following pause (<= max_gap, longer ones lose their middle). max_skip is unused.
     dialogue > 0 (multispeaker books): also windows of 1..max_sentences consecutive lines as they come, each kept with
     probability `dialogue`: one voice -> an ordinary span, several -> a scene with turn markers ("dialogue")."""
     rng = random.Random(seed)
     spans = []
-    for tok, g in idx.sort_values("order").groupby("tokens", sort=False):
+    for tok, g in idx.sort_values(["start_frame", "order"]).groupby("tokens", sort=False):  # time order: continuity
         game = g.superprod.iloc[0] == "superprod_4"
-        nxt = g.start_frame.shift(-1, fill_value=2**62).to_numpy()  # next sentence of any speaker: pause ends there
+        # next sentence of any speaker in time (not by order: a few books have lines out of order): the pause ends there
+        st = np.sort(g.start_frame.to_numpy())
+        nxt = np.append(st, 2**62)[np.searchsorted(st, g.start_frame.to_numpy(), side="right")]
         # a pause longer than max_gap loses its middle: half of max_gap stays after the sentence, half before the
         # pause ends (the decay and the next breath are kept); [end, pause_end) + [tail_start, tail_end)
         p = np.minimum((g.pause_after.fillna(0) * FPS).round().to_numpy(), nxt - g.end_frame.to_numpy()).clip(0).astype(np.int64)
@@ -173,7 +176,7 @@ def build_spans(idx, max_sentences, max_frames, max_gap, max_skip, seed=0, dialo
                 for r in rows[i:i + k]:
                     n = r.end_frame - r.start_frame
                     pause = pause_len(seg[-1]) if seg else 0  # the previous sentence keeps its pause
-                    if seg and (total + pause + n > max_frames or r.start_frame - seg[-1].end_frame > max_skip):
+                    if seg and (total + pause + n > max_frames or r.pos != seg[-1].pos + 1):  # continuous: the next line of the book
                         break
                     seg.append(r)
                     text.append(r.text.strip())
