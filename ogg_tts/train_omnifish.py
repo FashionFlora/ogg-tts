@@ -18,9 +18,9 @@ Speaker token (instruct field): speakers with >= 30 min (/data/dataset/build/spe
 get "speaker:pl_3"; everyone else - small speakers, game extras - the bag "speaker:pl_x". Per
 sample (--speaker-mode weights): token + prompt / token only (no prompt frames) / prompt only (instruct None);
 bag samples always carry their bag token and their prompt.
-Scene windows (multispeaker books, once sentence_ecapa.py has checked their lines): 1..--max-sentences consecutive
-lines as they come; one voice -> an ordinary span, several -> a scene, text "<|quad_start|>pl_3<|quad_end|>line
-<|quad_start|>pl_7<|quad_end|>line", instruct "dialogue", no prompt; --dialogue = share of the windows used.
+Scene windows (multispeaker books, once sentence_ecapa.py has checked their lines): 2..--max-sentences consecutive
+lines around a speaker change (--dialogue = share of the changes used), text "<|quad_start|>pl_3<|quad_end|>line
+<|quad_start|>pl_7<|quad_end|>line", instruct "dialogue", no prompt.
 --dialogue-prompt of the scenes name the voices S1, S2, ... and carry one prompt per voice (another 2-6 s line of
 that speaker, spoken first, text "<|quad_start|>S1<|quad_end|>its line ..." before the scene): dialogue of any voices.
 Recording quality: "quality:q35" (/data/dataset/build/quality_tokens.json: one per book, volumes recorded together
@@ -187,58 +187,57 @@ def build_spans(idx, max_sentences, max_frames, max_gap, max_skip, seed=0, dialo
 
 
 def dialogue_spans(tok, rows, rng, keep, max_lines, max_frames, prompted=0.0):
-    """windows of 1..max_lines consecutive kept lines (no line of the book skipped), whoever speaks; a window stops
-    at a speaker without an own token (bag, speaker_x: no voice to name). Each line keeps its own pause (at most
-    max_gap, middle cut), the last none. One speaker in the window -> an ordinary span; several -> a scene with turn markers.
+    """scenes around speaker changes: every change between two consecutive kept lines (no line of the book
+    skipped) of speakers with an own token (bag and speaker_x lines have no voice to name) is, with probability
+    `keep`, the centre of a window of 2..max_lines consecutive lines, the change at a random place inside it; the
+    window grows to the left and right only over such lines. Each line keeps its own pause (at most max_gap,
+    middle cut), the last none. Text with turn markers, instruct "dialogue".
     `prompted` of the scenes instead name their voices S1, S2, ... (first appearance) and carry one prompt per voice:
     another 2..6 s line of that speaker from the same book, outside the window, spoken first; text
     "<|quad_start|>S1<|quad_end|>prompt line <|quad_start|>S2<|quad_end|>prompt line" + the scene with S markers,
     instruct "dialogue", spk_token "dialogue_p" and the prompt length in frames as 9th field."""
+    named = lambda r: bool(r.spk_token) and not r.spk_token.endswith("_x")
+    linked = lambda a, b: named(a) and named(b) and b.pos == a.pos + 1  # a scene may run from line a to line b
     pool = {}
     for r in rows:  # prompt candidates per speaker token
-        if r.spk_token and not r.spk_token.endswith("_x") and 2 * FPS <= r.end_frame - r.start_frame <= 6 * FPS:
+        if named(r) and 2 * FPS <= r.end_frame - r.start_frame <= 6 * FPS:
             pool.setdefault(r.spk_token, []).append(r)
-    out, i = [], 0
-    while i < len(rows):
-        k = rng.randint(1, max_lines)
-        seg, turns, total = [], [], 0
-        for r in rows[i:i + k]:
-            if not r.spk_token or r.spk_token.endswith("_x") or (seg and r.pos != prev.pos + 1):
-                break
-            n = r.end_frame - r.start_frame
-            pause = pause_len(seg[-1]) if seg else 0
-            if seg and total + pause + n > max_frames:
-                break
-            seg.append(r)
-            turns.append((r.spk_token, r.text.strip()))
-            total += pause + n
-            prev = r
-        if turns and total <= max_frames and rng.random() < keep:
-            merged = splice(seg)
-            first, last = rows[i], rows[i + len(seg) - 1]
-            ctx = ((first.b2, first.b1), (last.a1, last.a2))
-            if len({t for t, _ in turns}) == 1:
-                out.append((tok, merged, " ".join(t for _, t in turns), first.lang, first.global_speaker,
-                            ctx, first.spk_token, first.q_token))
-            else:
-                scene = None
-                if rng.random() < prompted:
-                    voices = list(dict.fromkeys(t for t, _ in turns))
-                    used = {r.pos for r in seg}
-                    picks = [[c for c in pool.get(v, []) if c.pos not in used] for v in voices]
-                    if all(picks):
-                        picks = [rng.choice(p) for p in picks]
-                        plen = sum(int(p.end_frame - p.start_frame) for p in picks)
-                        if total + plen <= max_frames:
-                            name = {v: f"S{j + 1}" for j, v in enumerate(voices)}
-                            ptext = " ".join(f"<|quad_start|>{name[v]}<|quad_end|>{p.text.strip()}" for v, p in zip(voices, picks))
-                            stext = of.dialogue_text([(name[v], t) for v, t in turns])
-                            psegs = tuple((int(p.start_frame), int(p.end_frame)) for p in picks)
-                            scene = (tok, psegs + merged, f"{ptext} {stext}", first.lang, f"dialogue:{tok}", ctx,
-                                     "dialogue_p", first.q_token, plen)
-                out.append(scene or (tok, merged, of.dialogue_text(turns), first.lang, f"dialogue:{tok}", ctx,
-                                     "dialogue", first.q_token))
-        i += max(1, len(seg))
+    out = []
+    for j in range(1, len(rows)):
+        if not linked(rows[j - 1], rows[j]) or rows[j - 1].spk_token == rows[j].spk_token or rng.random() >= keep:
+            continue
+        k = rng.randint(2, max_lines)
+        left = rng.randint(0, k - 2)  # lines before rows[j - 1]
+        lo, hi = j - 1, j
+        while lo > 0 and j - 1 - lo < left and linked(rows[lo - 1], rows[lo]):
+            lo -= 1
+        while hi + 1 < len(rows) and hi - lo + 1 < k and linked(rows[hi], rows[hi + 1]):
+            hi += 1
+        seg = rows[lo:hi + 1]
+        total = sum(r.end_frame - r.start_frame for r in seg) + sum(pause_len(r) for r in seg[:-1])
+        if total > max_frames:
+            continue
+        turns = [(r.spk_token, r.text.strip()) for r in seg]
+        merged = splice(seg)
+        first, last = seg[0], seg[-1]
+        ctx = ((first.b2, first.b1), (last.a1, last.a2))
+        scene = None
+        if rng.random() < prompted:
+            voices = list(dict.fromkeys(t for t, _ in turns))
+            used = {r.pos for r in seg}
+            picks = [[c for c in pool.get(v, []) if c.pos not in used] for v in voices]
+            if all(picks):
+                picks = [rng.choice(p) for p in picks]
+                plen = sum(int(p.end_frame - p.start_frame) for p in picks)
+                if total + plen <= max_frames:
+                    name = {v: f"S{n + 1}" for n, v in enumerate(voices)}
+                    ptext = " ".join(f"<|quad_start|>{name[v]}<|quad_end|>{p.text.strip()}" for v, p in zip(voices, picks))
+                    stext = of.dialogue_text([(name[v], t) for v, t in turns])
+                    psegs = tuple((int(p.start_frame), int(p.end_frame)) for p in picks)
+                    scene = (tok, psegs + merged, f"{ptext} {stext}", first.lang, f"dialogue:{tok}", ctx,
+                             "dialogue_p", first.q_token, plen)
+        out.append(scene or (tok, merged, of.dialogue_text(turns), first.lang, f"dialogue:{tok}", ctx,
+                             "dialogue", first.q_token))
     return out
 
 
