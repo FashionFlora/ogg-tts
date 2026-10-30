@@ -104,6 +104,127 @@ def semantic_blocks(model, tok, prompt_codes, prompt_text, text, lang, block=16,
             return
 
 
+class _Stream:
+    """KV-cached sequences, one batch row per context (the conditional one and the empty CFG one), left-padded to a
+    common length: the context (text + prompt) and the finished clean blocks are computed once; the current block
+    is a query of `block` frames against the cache. Every allowed key of a block query is in the cache or in the
+    block itself (clean/noisy block b sees context, clean blocks < b and itself), so a row only masks its padding.
+    One forward per unmasking iteration serves both CFG branches."""
+
+    def __init__(self, model, contexts, dev):
+        from transformers import DynamicCache
+        self.model, self.dev, self.cache, self.done = model, dev, DynamicCache(), 0
+        C, B = of.NUM_CODEBOOKS, len(contexts)
+        self.ctx = [p.shape[1] + q.shape[1] for p, q in contexts]
+        T = max(self.ctx)
+        self.pad = [T - c for c in self.ctx]
+        if T == 0:
+            return
+        ids = torch.zeros(B, C, T, dtype=torch.long, device=dev)
+        am = torch.zeros(B, T, dtype=torch.bool, device=dev)
+        mask = torch.zeros(B, 1, T, T, dtype=torch.bool, device=dev)
+        pos = torch.zeros(B, T, dtype=torch.long, device=dev)
+        for r, (prefix, prompt) in enumerate(contexts):
+            k = self.pad[r]
+            ids[r, :, k:] = torch.cat([prefix.to(dev), prompt.to(dev)], 1)
+            am[r, k + prefix.shape[1]:] = True
+            mask[r, 0, k:, k:] = True  # context sees context
+            mask[r, 0, :k, :k] = torch.eye(k, dtype=torch.bool, device=dev)  # padding rows: themselves only
+            pos[r, k:] = torch.arange(self.ctx[r], device=dev)
+        self._run(ids, am, mask, pos)
+
+    def _run(self, ids, am, mask, pos):
+        with torch.autocast(self.dev.type, torch.bfloat16):
+            return self.model.llm(inputs_embeds=self.model.embed(ids, am), attention_mask=mask, position_ids=pos,
+                                  past_key_values=self.cache, use_cache=True, return_dict=True)[0]
+
+    def _block(self, semantic):
+        B, L, past = len(self.ctx), semantic.shape[0], self.cache.get_seq_length()
+        ids = torch.full((B, of.NUM_CODEBOOKS, L), of.MASK_ID, dtype=torch.long, device=self.dev)
+        ids[:, 0] = semantic
+        am = torch.ones(B, L, dtype=torch.bool, device=self.dev)
+        mask = torch.ones(B, 1, L, past + L, dtype=torch.bool, device=self.dev)
+        pos = torch.empty(B, L, dtype=torch.long, device=self.dev)
+        for r in range(B):
+            mask[r, 0, :, :self.pad[r]] = False
+            pos[r] = self.ctx[r] + self.done + torch.arange(L, device=self.dev)
+        return ids, am, mask, pos
+
+    def logits(self, cur):
+        """semantic logits [rows, frames, vocab] of the noisy block `cur`; the cache is left as it was"""
+        h = self._run(*self._block(cur))
+        self.cache.crop(-cur.shape[0])  # drop the noisy block again
+        head = self.model.semantic_head
+        return head(h.to(head.weight.dtype)).float()
+
+    def commit(self, cur):
+        """append the finished block as a clean block; returns row 0's hidden states (the MTP input)"""
+        h = self._run(*self._block(cur))[0]
+        self.done += cur.shape[0]
+        return h
+
+
+@torch.no_grad()
+def semantic_blocks_cached(model, tok, prompt_codes, prompt_text, text, lang, block=16, steps=8, cfg=2.0,
+                           temperature=0.8, max_frames=None, seed=0, before=(), after=(), speaker=None, quality=None):
+    """same as semantic_blocks (same schedule and sampling), with KV caches for the conditional and the CFG
+    branch. Yields (semantic ids of every frame so far, clean-pass hidden states [frames, H]) after each block."""
+    dev = next(model.parameters()).device
+    g = torch.Generator(device=dev).manual_seed(seed)
+    full_text = f"{prompt_text} {text}".strip()
+    if prompt_codes is None:
+        prompt_codes, prompt_text = torch.zeros(of.NUM_CODEBOOKS, 0, dtype=torch.long), ""
+    if max_frames is None:
+        rate = prompt_codes.shape[1] / len(prompt_text) if prompt_text else 1.6
+        max_frames = int(2 * rate * len(text)) + 2 * block
+    none = torch.zeros(of.NUM_CODEBOOKS, 0, dtype=torch.long)
+    contexts = [(prefix_ids(tok, full_text, lang, before, after, speaker, quality), prompt_codes)]
+    st = _Stream(model, contexts + ([(none, none)] if cfg > 0 else []), dev)
+    clean = torch.zeros(0, dtype=torch.long, device=dev)
+    hidden = []
+    while clean.shape[0] < max_frames:
+        cur = torch.full((block,), of.MASK_ID, dtype=torch.long, device=dev)
+        for s in range(steps):
+            lg = st.logits(cur)
+            logits = lg[0] + cfg * (lg[0] - lg[1]) if cfg > 0 else lg[0]
+            logits[:, of.MASK_ID] = -float("inf")
+            masked = cur == of.MASK_ID
+            probs = F.softmax(logits / max(temperature, 1e-5), -1)
+            sample = torch.multinomial(probs, 1, generator=g)[:, 0] if temperature > 0 else logits.argmax(-1)
+            conf = probs.gather(1, sample[:, None])[:, 0]
+            conf = torch.where(masked, conf, torch.full_like(conf, -1.0))
+            keep_masked = int(math.floor(block * math.cos(math.pi / 2 * (s + 1) / steps)))
+            n_fix = int(masked.sum()) - keep_masked
+            if n_fix > 0:
+                idx = conf.topk(n_fix).indices
+                cur[idx] = sample[idx]
+        hidden.append(st.commit(cur))
+        clean = torch.cat([clean, cur])
+        yield clean, torch.cat(hidden)
+        if (cur >= of.END_ID).any():
+            return
+
+
+@torch.no_grad()
+def generate_cached(model, tok, prompt_codes, prompt_text, text, lang, block=16, steps=8, cfg=3.0, temperature=0.8,
+                    mtp_temperature=0.8, max_frames=None, seed=0, before=(), after=(), speaker=None, quality=None):
+    """generate() with KV caches: whole utterance -> codes [10, frames]"""
+    for clean, h in semantic_blocks_cached(model, tok, prompt_codes, prompt_text, text, lang, block, steps, cfg,
+                                           temperature, max_frames, seed, before, after, speaker, quality):
+        pass
+    n = speech_frames(clean)
+    dev = clean.device
+    if n == 0:
+        return torch.zeros(of.NUM_CODEBOOKS, 0, dtype=torch.long, device=dev)
+    fpos = torch.arange(n, device=dev)[None]
+    valid = torch.ones(1, n, dtype=torch.bool, device=dev)
+    attn = model.frame_attention(fpos // block, valid)
+    with torch.autocast(dev.type, torch.bfloat16):
+        dtype = next(model.mtp.parameters()).dtype  # fp32 or bf16 weights
+        return model.mtp.generate(h[:n].to(dtype)[None], clean[None, :n], fpos, valid, temperature=mtp_temperature,
+                                  attn=attn)[0]
+
+
 def speech_frames(clean):
     end = (clean >= of.END_ID).nonzero()
     return int(end[0]) if len(end) else clean.shape[0]
@@ -238,7 +359,8 @@ def main():
     ap.add_argument("--before", nargs="*", default=[], help="up to 2 sentences of text context before (not spoken)")
     ap.add_argument("--after", nargs="*", default=[], help="up to 2 sentences of text context after (not spoken)")
     ap.add_argument("--out", default="out.wav")
-    ap.add_argument("--steps", type=int, default=8, help="unmasking iterations per block")
+    ap.add_argument("--steps", type=int, default=6, help="unmasking iterations per block")
+    ap.add_argument("--no-cache", action="store_true", help="reference decoder: recompute the whole sequence every pass")
     ap.add_argument("--block", type=int, default=16, help="frames per block (as trained)")
     ap.add_argument("--cfg", type=float, default=3.0)
     ap.add_argument("--temperature", type=float, default=0.8)
@@ -257,7 +379,8 @@ def main():
     if args.prompt_tokens:
         path, s, e = args.prompt_tokens.rsplit(":", 2)
         prompt = torch.from_numpy(np.asarray(np.load(path, mmap_mode="r")[:, int(s):int(e)], dtype=np.int64))
-    codes = generate(model, tok, prompt, args.prompt_text, args.text, args.lang, block=args.block, steps=args.steps,
+    gen = generate if args.no_cache else generate_cached
+    codes = gen(model, tok, prompt, args.prompt_text, args.text, args.lang, block=args.block, steps=args.steps,
                      cfg=args.cfg, temperature=args.temperature, mtp_temperature=args.mtp_temperature,
                      before=args.before, after=args.after,
                      speaker=args.speaker, quality=args.quality)
