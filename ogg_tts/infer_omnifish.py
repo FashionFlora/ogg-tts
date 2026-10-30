@@ -206,8 +206,8 @@ def semantic_blocks_cached(model, tok, prompt_codes, prompt_text, text, lang, bl
 
 
 @torch.no_grad()
-def generate_cached(model, tok, prompt_codes, prompt_text, text, lang, block=16, steps=8, cfg=3.0, temperature=0.8,
-                    mtp_temperature=0.8, max_frames=None, seed=0, before=(), after=(), speaker=None, quality=None):
+def generate_cached(model, tok, prompt_codes, prompt_text, text, lang, block=16, steps=6, cfg=2.0, temperature=0.8,
+                    mtp_temperature=0.0, max_frames=None, seed=0, before=(), after=(), speaker=None, quality=None):
     """generate() with KV caches: whole utterance -> codes [10, frames]"""
     for clean, h in semantic_blocks_cached(model, tok, prompt_codes, prompt_text, text, lang, block, steps, cfg,
                                            temperature, max_frames, seed, before, after, speaker, quality):
@@ -362,10 +362,10 @@ def main():
     ap.add_argument("--steps", type=int, default=6, help="unmasking iterations per block")
     ap.add_argument("--no-cache", action="store_true", help="reference decoder: recompute the whole sequence every pass")
     ap.add_argument("--block", type=int, default=16, help="frames per block (as trained)")
-    ap.add_argument("--cfg", type=float, default=3.0)
+    ap.add_argument("--cfg", type=float, default=2.0)
     ap.add_argument("--temperature", type=float, default=0.8)
-    ap.add_argument("--mtp-temperature", type=float, default=0.8,
-                    help="sampling temperature of the acoustic codes (0 = argmax, which flattens the timbre)")
+    ap.add_argument("--mtp-temperature", type=float, default=0.0,
+                    help="sampling temperature of the acoustic codes; 0 = argmax (most voiced, stable); sampling roughens the voice")
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--sentences", type=int, default=1, help="demo: consecutive sentences per target (<= 25 s)")
     args = ap.parse_args()
