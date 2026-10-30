@@ -132,13 +132,18 @@ class MTPDecoder(nn.Module):
         return out
 
     @torch.no_grad()
-    def generate(self, h, semantic, positions, valid, temperature=0.0, attn=None):
-        """semantic [B, T] -> codes [B, 10, T]; every layer on all frames at once"""
+    def generate(self, h, semantic, positions, valid, temperature=0.0, attn=None, top_k=0, sample_layers=None):
+        """semantic [B, T] -> codes [B, 10, T]; every layer on all frames at once. All frames of a codebook are drawn
+        at once and independently, so sampling (temperature > 0) can make neighbouring frames disagree: top_k keeps
+        only the k most likely codes, sample_layers samples only the first n residual codebooks (argmax for the rest)"""
         codes = [semantic]
-        for layer in self.layers:
+        for k, layer in enumerate(self.layers):
             h, logits = layer(h, codes[-1], positions, valid, attn)
-            if temperature > 0:
-                nxt = torch.distributions.Categorical(logits=logits.float() / temperature).sample()
+            if temperature > 0 and (sample_layers is None or k < sample_layers):
+                lg = logits.float() / temperature
+                if top_k > 0:
+                    lg = lg.masked_fill(lg < lg.topk(top_k, -1).values[..., -1:], -float("inf"))
+                nxt = torch.distributions.Categorical(logits=lg).sample()
             else:
                 nxt = logits.argmax(-1)
             codes.append(nxt)
