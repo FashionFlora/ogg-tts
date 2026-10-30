@@ -61,9 +61,7 @@ See `ogg_tts/omnifish.py`.
 - **Data:** ~8.2k hours of professional voice acting. Sources: multi-cast audiobook productions, single-narrator audiobooks, and voiced dialogue
   from four AAA games. 16.6k speakers, 8 languages.
 - **Emotion tags:** produced by an audio-LLM pass (Gemini) that tags only what is audible.
-- **Hardware:** 1× NVIDIA RTX PRO 6000 Blackwell (AWS `g7e.2xlarge`, ~$3.36/h), ~320 h of audio per training hour.
-- **Cost:** about $500 of GPU for data encoding, speaker checks and the full 400k-step pre-training (~103 h). Tagging used about 129M
-  Gemini tokens, ~$180 at list price.
+- **Hardware:** 1× NVIDIA RTX PRO 6000 Blackwell.
 
 Full details are in the model card on Hugging Face.
 
