@@ -30,7 +30,8 @@ speaker) (ECAPA2 groups, /data/dataset/build/speaker_map.parquet), so the most r
 dominate; rounds are re-drawn every --reload-every steps, so all their audio still comes up over time.
 Block diffusion (LLaDA2.0 / BD3-LM, see omnifish.py): prompt = first 0..30 % of the frames (no loss); the rest
 is the target - its semantic ids, then END and the Rainbow PAD cycle up to a multiple of the block size -
-present twice, clean and noisy; every noisy block is masked at its own uniform random ratio. 10 %
+present three times: clean with semantic ids only (the MTP's input), clean with all 10 codes (the context of
+later blocks), noisy; every noisy block is masked at its own uniform random ratio. 10 %
 unconditional (no text/language/prompt), language tag in 80 % of the rest, instruct = speaker token or "None".
 Gemini text (/data/dataset/build/gemini_text.parquet, make_gemini_text.py) replaces a sentence's text where it has one:
 inline audio tags ([sighing], [shouting], ...) plus the checked spoken-form transcript; spans with tags come up
@@ -271,7 +272,8 @@ class SpanDataset(IterableDataset):
 
     def process(self, span, rng):
         """-> ids [10, L], semantic labels, codes [10, L], audio mask, MTP target mask, MTP block, kind, block,
-        positions; layout [style + text][prompt][clean target][noisy target], kind 0 / 0 / 1 / 2"""
+        positions; layout [style + text][prompt][clean target, semantic ids][clean target, all 10 codes][noisy
+        target], kind 0 / 0 / 1 / 3 / 2 (see omnifish.block_attention)"""
         name, segments, text, lang, _, (before, after), spk_token, q_token, *fixed = span  # fixed: prompt frames of a "dialogue_p" scene
         if rng.random() < self.args.tag_drop:  # tags stay optional: the same text without them
             text = strip_tags(text)
@@ -310,6 +312,8 @@ class SpanDataset(IterableDataset):
         m = torch.rand(nt, generator=g) < ratio[blk]
         if not m.any():
             m[torch.randint(nt, (1,), generator=g)] = True
+        full = clean.clone()  # the 10 true codes of the speech frames (END / PAD frames keep MASK residuals)
+        full[1:, :n] = audio[1:, plen:]
         noisy = clean.clone()
         noisy[0][m] = of.MASK_ID
         if drop_cond:
@@ -323,19 +327,20 @@ class SpanDataset(IterableDataset):
                            return_tensors="pt").input_ids
             prefix = torch.cat([style, txt], 1).repeat(C, 1)
         S, ctx = prefix.shape[1], prefix.shape[1] + plen
-        ids = torch.cat([prefix, audio[:, :plen], clean, noisy], 1)
+        ids = torch.cat([prefix, audio[:, :plen], clean, full, noisy], 1)
         L = ids.shape[1]
         sem = torch.full((L,), -100)
-        sem[ctx + nt:][m] = tgt[m]
+        sem[ctx + 2 * nt:][m] = tgt[m]
         codes = torch.zeros(C, L, dtype=torch.long)
         codes[:, ctx:ctx + n] = audio[:, plen:]
         amask = torch.ones(L, dtype=torch.bool)
         amask[:S] = False
         tmask = torch.zeros(L, dtype=torch.bool)
         tmask[ctx:ctx + n] = True
-        kind = torch.cat([torch.zeros(ctx, dtype=torch.long), torch.ones(nt, dtype=torch.long), torch.full((nt,), 2)])
-        block = torch.cat([torch.zeros(ctx, dtype=torch.long), blk, blk])
-        pos = torch.cat([torch.arange(ctx), ctx + torch.arange(nt), ctx + torch.arange(nt)])
+        kind = torch.cat([torch.zeros(ctx, dtype=torch.long), torch.ones(nt, dtype=torch.long), torch.full((nt,), 3),
+                          torch.full((nt,), 2)])
+        block = torch.cat([torch.zeros(ctx, dtype=torch.long), blk, blk, blk])
+        pos = torch.cat([torch.arange(ctx), ctx + torch.arange(nt), ctx + torch.arange(nt), ctx + torch.arange(nt)])
         return ids, sem, codes, amask, tmask, block, kind, pos
 
     def __iter__(self):

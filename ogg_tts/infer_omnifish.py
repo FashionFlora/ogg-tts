@@ -39,71 +39,6 @@ def prefix_ids(tok, text, lang, before=(), after=(), speaker=None, quality=None)
     return torch.cat([style, txt], 1).repeat(C, 1)
 
 
-def sequence(prefix, prompt, clean, noisy, block):
-    """[text][prompt (10 codes)][clean blocks (semantic)][noisy block] -> ids [1, 10, L], audio mask, attention,
-    positions, slice of the clean frames, slice of the noisy frames"""
-    C, dev = of.NUM_CODEBOOKS, clean.device
-    S, P, nc, nn_ = prefix.shape[1], prompt.shape[1], clean.shape[0], noisy.shape[0]
-    tgt = torch.full((C, nc + nn_), of.MASK_ID, dtype=torch.long, device=dev)
-    tgt[0] = torch.cat([clean, noisy])
-    ids = torch.cat([prefix.to(dev), prompt.to(dev), tgt], 1)[None]
-    L, ctx = ids.shape[-1], S + P
-    am = torch.ones(1, L, dtype=torch.bool, device=dev)
-    am[:, :S] = False
-    kind = torch.cat([torch.zeros(ctx), torch.ones(nc), torch.full((nn_,), 2)]).long().to(dev)[None]
-    blk = torch.cat([torch.zeros(ctx), torch.arange(nc) // block, torch.full((nn_,), nc // block)]).long().to(dev)[None]
-    pos = torch.arange(L, device=dev)[None]
-    return ids, am, of.block_attention(kind, blk), pos, slice(ctx, ctx + nc), slice(ctx + nc, L)
-
-
-@torch.no_grad()
-def semantic_blocks(model, tok, prompt_codes, prompt_text, text, lang, block=16, steps=8, cfg=2.0, temperature=0.8,
-                    max_frames=None, seed=0, before=(), after=(), speaker=None, quality=None):
-    """block diffusion: blocks of `block` frames left to right, each unmasked in `steps` iterations (most
-    confident first, cosine schedule, CFG against the sequence without text and prompt). Yields (prefix ids,
-    semantic ids of every frame so far) after each block; the last block holds END (or a PAD), or the safety
-    cap is reached."""
-    dev = next(model.parameters()).device
-    g = torch.Generator(device=dev).manual_seed(seed)
-    full_text = f"{prompt_text} {text}".strip()
-    if prompt_codes is None:  # speaker token only, no voice prompt
-        prompt_codes, prompt_text = torch.zeros(of.NUM_CODEBOOKS, 0, dtype=torch.long), ""
-    if max_frames is None:  # safety cap only: twice the prompt's speaking rate (~1.6 frames/char without one)
-        rate = prompt_codes.shape[1] / len(prompt_text) if prompt_text else 1.6
-        max_frames = int(2 * rate * len(text)) + 2 * block
-    prefix = prefix_ids(tok, full_text, lang, before, after, speaker, quality)
-    none = torch.zeros(of.NUM_CODEBOOKS, 0, dtype=torch.long)
-    clean = torch.zeros(0, dtype=torch.long, device=dev)
-
-    def logits_of(pre, pro, cur):
-        ids, am, att, pos, _, ns = sequence(pre, pro, clean, cur, block)
-        with torch.autocast(dev.type, torch.bfloat16):
-            h = model.backbone(ids, am, att, pos)
-            return model.semantic_head(h[:, ns]).float()[0]
-
-    while clean.shape[0] < max_frames:
-        cur = torch.full((block,), of.MASK_ID, dtype=torch.long, device=dev)
-        for s in range(steps):
-            logits = logits_of(prefix, prompt_codes, cur)
-            if cfg > 0:
-                logits = logits + cfg * (logits - logits_of(none, none, cur))
-            logits[:, of.MASK_ID] = -float("inf")
-            masked = cur == of.MASK_ID
-            probs = F.softmax(logits / max(temperature, 1e-5), -1)
-            sample = torch.multinomial(probs, 1, generator=g)[:, 0] if temperature > 0 else logits.argmax(-1)
-            conf = probs.gather(1, sample[:, None])[:, 0]
-            conf = torch.where(masked, conf, torch.full_like(conf, -1.0))
-            keep_masked = int(math.floor(block * math.cos(math.pi / 2 * (s + 1) / steps)))
-            n_fix = int(masked.sum()) - keep_masked
-            if n_fix > 0:
-                idx = conf.topk(n_fix).indices
-                cur[idx] = sample[idx]
-        clean = torch.cat([clean, cur])
-        yield prefix, clean
-        if (cur >= of.END_ID).any():
-            return
-
-
 class _Stream:
     """KV-cached sequences, one batch row per context (the conditional one and the empty CFG one), left-padded to a
     common length: the context (text + prompt) and the finished clean blocks are computed once; the current block
@@ -138,10 +73,12 @@ class _Stream:
             return self.model.llm(inputs_embeds=self.model.embed(ids, am), attention_mask=mask, position_ids=pos,
                                   past_key_values=self.cache, use_cache=True, return_dict=True)[0]
 
-    def _block(self, semantic):
+    def _block(self, semantic, full=None):
         B, L, past = len(self.ctx), semantic.shape[0], self.cache.get_seq_length()
         ids = torch.full((B, of.NUM_CODEBOOKS, L), of.MASK_ID, dtype=torch.long, device=self.dev)
         ids[:, 0] = semantic
+        if full is not None:  # a decided block with its residual codes (MASK where END / PAD)
+            ids[:] = full
         am = torch.ones(B, L, dtype=torch.bool, device=self.dev)
         mask = torch.ones(B, 1, L, past + L, dtype=torch.bool, device=self.dev)
         pos = torch.empty(B, L, dtype=torch.long, device=self.dev)
@@ -157,20 +94,30 @@ class _Stream:
         head = self.model.semantic_head
         return head(h.to(head.weight.dtype)).float()
 
-    def commit(self, cur):
-        """append the finished block as a clean block; returns row 0's hidden states (the MTP input)"""
+    def peek(self, cur):
+        """row 0's hidden states of the decided block with semantic ids only (the MTP input); cache unchanged"""
         h = self._run(*self._block(cur))[0]
-        self.done += cur.shape[0]
+        self.cache.crop(-cur.shape[0])
         return h
+
+    def commit(self, full):
+        """append the decided block with all 10 codes [10, block] as context of the later blocks"""
+        self._run(*self._block(full[0], full))
+        self.done += full.shape[1]
 
 
 @torch.no_grad()
-def semantic_blocks_cached(model, tok, prompt_codes, prompt_text, text, lang, block=16, steps=8, cfg=2.0,
-                           temperature=0.8, max_frames=None, seed=0, before=(), after=(), speaker=None, quality=None):
-    """same as semantic_blocks (same schedule and sampling), with KV caches for the conditional and the CFG
-    branch. Yields (semantic ids of every frame so far, clean-pass hidden states [frames, H]) after each block."""
+def blocks_cached(model, tok, prompt_codes, prompt_text, text, lang, block=16, steps=6, cfg=2.0, temperature=0.8,
+                  max_frames=None, seed=0, before=(), after=(), speaker=None, quality=None, mtp_temperature=0.0,
+                  mtp_top_k=0, mtp_rounds=4):
+    """block diffusion with KV caches (one batch row for the conditional and one for the CFG branch). Per block:
+    unmask its semantic ids in `steps` iterations, run the MTP on it (semantic-only states), append it with all
+    10 codes to the cache as context of the later blocks. Yields (semantic ids of every frame so far, codes
+    [10, frames]) after each block; the last block holds END (or a PAD), or the safety cap is reached."""
     dev = next(model.parameters()).device
     g = torch.Generator(device=dev).manual_seed(seed)
+    if mtp_temperature > 0:
+        torch.manual_seed(seed)
     full_text = f"{prompt_text} {text}".strip()
     if prompt_codes is None:
         prompt_codes, prompt_text = torch.zeros(of.NUM_CODEBOOKS, 0, dtype=torch.long), ""
@@ -180,8 +127,9 @@ def semantic_blocks_cached(model, tok, prompt_codes, prompt_text, text, lang, bl
     none = torch.zeros(of.NUM_CODEBOOKS, 0, dtype=torch.long)
     contexts = [(prefix_ids(tok, full_text, lang, before, after, speaker, quality), prompt_codes)]
     st = _Stream(model, contexts + ([(none, none)] if cfg > 0 else []), dev)
+    mtp_dtype = next(model.mtp.parameters()).dtype
+    S = model.mtp.new_state(max_frames + block, model.llm.config.hidden_size, dev, mtp_dtype)
     clean = torch.zeros(0, dtype=torch.long, device=dev)
-    hidden = []
     while clean.shape[0] < max_frames:
         cur = torch.full((block,), of.MASK_ID, dtype=torch.long, device=dev)
         for s in range(steps):
@@ -198,28 +146,37 @@ def semantic_blocks_cached(model, tok, prompt_codes, prompt_text, text, lang, bl
             if n_fix > 0:
                 idx = conf.topk(n_fix).indices
                 cur[idx] = sample[idx]
-        hidden.append(st.commit(cur))
+        lo = clean.shape[0]
+        end = (cur >= of.END_ID).nonzero()
+        nb = int(end[0]) if len(end) else block  # speech frames of this block
+        full = torch.full((of.NUM_CODEBOOKS, block), of.MASK_ID, dtype=torch.long, device=dev)
+        full[0] = cur
+        if nb:
+            h = st.peek(cur)
+            S["codes"][0, lo:lo + nb], S["states"][0][0, lo:lo + nb] = cur[:nb], h[:nb].to(mtp_dtype)
+            with torch.autocast(dev.type, torch.bfloat16):
+                model.mtp.decode_block(S, lo, lo + nb, block, mtp_rounds, mtp_temperature, mtp_top_k)
+            full[1:, :nb] = S["codes"][1:, lo:lo + nb]
         clean = torch.cat([clean, cur])
-        yield clean, torch.cat(hidden)
-        if (cur >= of.END_ID).any():
+        yield clean, S["codes"][:, :lo + nb]
+        if len(end):
             return
+        st.commit(full)
 
 
 @torch.no_grad()
 def generate_cached(model, tok, prompt_codes, prompt_text, text, lang, block=16, steps=6, cfg=2.0, temperature=0.8,
-                    mtp_temperature=0.0, mtp_top_k=0, mtp_rounds=4, max_frames=None, seed=0, before=(), after=(), speaker=None, quality=None):
-    """generate() with KV caches: whole utterance -> codes [10, frames]"""
-    for clean, h in semantic_blocks_cached(model, tok, prompt_codes, prompt_text, text, lang, block, steps, cfg,
-                                           temperature, max_frames, seed, before, after, speaker, quality):
+                    mtp_temperature=0.0, mtp_top_k=0, mtp_rounds=4, max_frames=None, seed=0, before=(), after=(),
+                    speaker=None, quality=None):
+    """whole utterance -> codes [10, speech frames]"""
+    for clean, codes in blocks_cached(model, tok, prompt_codes, prompt_text, text, lang, block, steps, cfg,
+                                      temperature, max_frames, seed, before, after, speaker, quality,
+                                      mtp_temperature, mtp_top_k, mtp_rounds):
         pass
-    n = speech_frames(clean)
-    dev = clean.device
-    if n == 0:
-        return torch.zeros(of.NUM_CODEBOOKS, 0, dtype=torch.long, device=dev)
-    with torch.autocast(dev.type, torch.bfloat16):
-        dtype = next(model.mtp.parameters()).dtype  # fp32 or bf16 weights
-        return model.mtp.generate(h[:n].to(dtype), clean[:n], block, rounds=mtp_rounds, temperature=mtp_temperature,
-                                  top_k=mtp_top_k)
+    return codes[:, :speech_frames(clean)].clone()
+
+
+generate = generate_cached
 
 
 def speech_frames(clean):
@@ -228,71 +185,27 @@ def speech_frames(clean):
 
 
 @torch.no_grad()
-def residuals(model, prefix, prompt_codes, clean, n, block, mtp_temperature=0.0):
-    """codes [10, n] of the first n frames: the clean pass over every generated frame, then the MTP
-    (block-causal over frames, so frames of finished blocks never change as more blocks come)"""
-    dev = clean.device
-    if n == 0:
-        return torch.zeros(of.NUM_CODEBOOKS, 0, dtype=torch.long, device=dev)
-    ids, am, att, pos, cs, _ = sequence(prefix, prompt_codes, clean, clean[:0], block)
-    with torch.autocast(dev.type, torch.bfloat16):
-        h = model.backbone(ids, am, att, pos)
-    ht = h[0, cs][:n]
-    with torch.autocast(dev.type, torch.bfloat16):
-        return model.mtp.generate(ht.to(next(model.mtp.parameters()).dtype), clean[:n], block,
-                                  temperature=mtp_temperature)
-
-
-@torch.no_grad()
-def generate(model, tok, prompt_codes, prompt_text, text, lang, block=16, steps=8, cfg=2.0, temperature=0.8,
-             mtp_temperature=0.0, max_frames=None, seed=0, before=(), after=(), speaker=None, quality=None):
-    """whole utterance -> codes [10, frames]; the speech is everything before END. before / after: text context;
-    speaker: token name; prompt_codes may be None with a speaker token"""
-    for prefix, clean in semantic_blocks(model, tok, prompt_codes, prompt_text, text, lang, block, steps, cfg,
-                                         temperature, max_frames, seed, before, after, speaker, quality):
-        pass
-    if prompt_codes is None:
-        prompt_codes = torch.zeros(of.NUM_CODEBOOKS, 0, dtype=torch.long)
-    return residuals(model, prefix, prompt_codes, clean, speech_frames(clean), block, mtp_temperature)
-
-
-@torch.no_grad()
-def stream(model, tok, codec, prompt_codes, prompt_text, text, lang, block=16, steps=8, cfg=2.0, temperature=0.8,
+def stream(model, tok, codec, prompt_codes, prompt_text, text, lang, block=16, steps=6, cfg=2.0, temperature=0.8,
            mtp_temperature=0.0, max_frames=None, seed=0, chunks=(1, 2, 4), before=(), after=(), speaker=None, quality=None):
     """streaming: yields 44.1 kHz audio chunks (numpy). A chunk is emitted after chunks[0] blocks, then every
     chunks[1], ... blocks (the last size repeats), and at END. The codec is causal but has a long memory, so each
-    chunk is decoded from the start of the utterance (codes of emitted frames frozen) and only its new samples
-    are emitted: the joined chunks equal decoding the streamed codes at once, seamless at every join."""
-    if prompt_codes is None:
-        prompt_codes, prompt_text = torch.zeros(of.NUM_CODEBOOKS, 0, dtype=torch.long), ""
+    chunk is decoded from the start of the utterance and only its new samples are emitted: the joined chunks equal
+    decoding the codes at once, seamless at every join. Decided blocks never change."""
     sizes, emitted, since = list(chunks), 0, 0
-    done = None  # codes of the frames already emitted: frozen, so a later MTP pass (numerics) cannot change them
-
-    def new_audio(prefix, clean):
-        nonlocal emitted, done
-        codes = residuals(model, prefix, prompt_codes, clean, speech_frames(clean), block, mtp_temperature)
-        if done is not None:
-            codes = torch.cat([done, codes[:, done.shape[1]:]], 1)
-        done = codes
-        wav = fc.decode(codec, codes[None])[0].float().cpu().numpy() if codes.shape[1] else np.zeros(0, np.float32)
-        out, emitted = wav[emitted:], max(emitted, len(wav))
-        return out
-
-    for prefix, clean in semantic_blocks(model, tok, prompt_codes, prompt_text, text, lang, block, steps, cfg,
-                                         temperature, max_frames, seed, before, after, speaker, quality):
+    for clean, codes in blocks_cached(model, tok, prompt_codes, prompt_text, text, lang, block, steps, cfg,
+                                      temperature, max_frames, seed, before, after, speaker, quality, mtp_temperature):
         since += 1
-        if since < sizes[0] and speech_frames(clean) == clean.shape[0]:  # chunk not full and no END yet
+        last = bool((clean[-block:] >= of.END_ID).any())
+        if since < sizes[0] and not last:
             continue
         since = 0
         if len(sizes) > 1:
             sizes.pop(0)
-        chunk = new_audio(prefix, clean)
-        if len(chunk):
-            yield chunk
-    if since:  # safety cap reached inside a chunk
-        chunk = new_audio(prefix, clean)
-        if len(chunk):
-            yield chunk
+        n = speech_frames(clean)
+        wav = fc.decode(codec, codes[None, :, :n])[0].float().cpu().numpy() if n else np.zeros(0, np.float32)
+        if len(wav) > emitted:
+            yield wav[emitted:]
+            emitted = len(wav)
 
 
 def load_model(ckpt, device="cuda"):

@@ -7,14 +7,15 @@ code k+1), but ~170M params, trained from scratch, attending over all frames in 
 Block diffusion (as LLaDA2.0 / BD3-LM): the target is generated in blocks of frames, left to right; inside
 a block, masked iterative unmasking. Training sequence:
   [<|lang_start|>pl<|lang_end|><|instruct_start|>None<|instruct_end|>] [<|text_start|>text<|text_end|>]
-  [prompt frames] [clean target blocks] [noisy target blocks]
-attention (see block_attention): context (text + prompt) sees only context; clean block b sees context and
-clean blocks <= b; noisy block b sees context, clean blocks < b and itself. Noisy blocks share the positions
-of their clean copies. Length is the model's own call (Rainbow Padding): the speech is followed by one
+  [prompt frames] [clean target blocks, semantic ids] [clean target blocks, all 10 codes] [noisy target blocks]
+attention (see block_attention): context (text + prompt) sees only context; a full block (10 codes) sees context
+and full blocks <= b; a semantic-only block and a noisy block b see context, full blocks < b and themselves. The
+three copies share positions. So the backbone predicts a block from the full codes (timbre included) of the
+blocks before it, and the MTP reads the semantic-only copy. Length is the model's own call (Rainbow Padding): the speech is followed by one
 END frame and the PAD_IDS cycle up to the block boundary; generation stops at the block holding END.
-Audio frame inputs (all 10 codebook embeddings summed): prompt frames carry their 10 true codes; target
-frames carry only the semantic id (or MASK_ID) and MASK_ID for codebooks 1..9 - the same at training and
-inference. Losses: semantic CE on masked noisy frames (END/PAD included) + residual CE of the MTP, trained as masked
+Audio frame inputs (all 10 codebook embeddings summed): prompt frames and full target frames carry their 10
+codes; semantic-only and noisy target frames carry only the semantic id (or MASK_ID) and MASK_ID for codebooks
+1..9 - the same at training and inference. Losses: semantic CE on masked noisy frames (END/PAD included) + residual CE of the MTP, trained as masked
 prediction over frames (see mtp_unmask_loss): it decodes a block codebook by codebook, unmasking the frames of
 each codebook in a few rounds while seeing every decided code of the earlier blocks.
 """
@@ -67,12 +68,16 @@ def dialogue_text(turns):
 
 
 def block_attention(kind, block):
-    """kind [B, L] (0 context, 1 clean target, 2 noisy target, -1 padding), block [B, L] -> [B, 1, L, L]:
-    context sees context; clean block b sees context and clean blocks <= b; noisy block b sees context,
-    clean blocks < b and itself; padding rows see every real position (no empty row)"""
+    """kind [B, L] (0 context, 1 clean target with semantic ids only, 3 clean target with all 10 codes, 2 noisy
+    target, -1 padding), block [B, L] -> [B, 1, L, L]. Context sees context; full block b (3) sees context and
+    full blocks <= b; semantic-only block b (1, the MTP's input states) and noisy block b (2) see context, full
+    blocks < b and themselves. So a block's semantic is predicted from everything decided before it, residual
+    codes of earlier blocks included, and the MTP never sees the codes it predicts. Padding rows see every real
+    position (no empty row)."""
     kq, kk, bq, bk = kind[:, :, None], kind[:, None, :], block[:, :, None], block[:, None, :]
-    att = ((kk == 0) & (kq >= 0)) | ((kq == 1) & (kk == 1) & (bk <= bq)) \
-        | ((kq == 2) & (kk == 1) & (bk < bq)) | ((kq == 2) & (kk == 2) & (bk == bq)) | ((kq == -1) & (kk >= 0))
+    att = ((kk == 0) & (kq >= 0)) | ((kq == 3) & (kk == 3) & (bk <= bq)) \
+        | ((kq == 1) & (kk == 3) & (bk < bq)) | ((kq == 1) & (kk == 1) & (bk == bq)) \
+        | ((kq == 2) & (kk == 3) & (bk < bq)) | ((kq == 2) & (kk == 2) & (bk == bq)) | ((kq == -1) & (kk >= 0))
     return att[:, None]
 
 
@@ -137,56 +142,58 @@ class MTPDecoder(nn.Module):
             out.append(logits)
         return out
 
+    def new_state(self, T, dim, device, dtype):
+        """buffers for block-by-block decoding of up to T frames: codes [10, T], clean input states of every layer"""
+        return {"codes": torch.zeros(NUM_CODEBOOKS, T, dtype=torch.long, device=device),
+                "states": [torch.zeros(1, T, dim, dtype=dtype, device=device) for _ in range(len(self.layers) + 1)]}
+
+    @torch.no_grad()
+    def decode_block(self, S, lo, hi, block, rounds=4, temperature=0.0, top_k=0):
+        """fill codebooks 1..9 of frames lo:hi (S["states"][0] = backbone states, S["codes"][0] = semantic ids
+        already set there; frames < lo decided). Codebook by codebook, the frames of a codebook are unmasked over
+        `rounds` iterations (most confident first, cosine schedule), each seeing the decided codes of the earlier
+        blocks and of the frames revealed so far; layer k's input state is layer k-1's clean pass (all decided)."""
+        codes, states, dev = S["codes"], S["states"], S["codes"].device
+        pos = torch.arange(hi, device=dev)[None]
+        bb = torch.arange(hi, device=dev) // block
+        kind = (torch.arange(hi, device=dev) >= lo).long()
+        attn = (((bb[None, :, None] >= bb[None, None, :]) & (kind[None, None, :] == 0)) |
+                ((kind[None, :, None] == 1) & (kind[None, None, :] == 1)))[:, None]
+        cattn = (bb[None, :, None] >= bb[None, None, :])[:, None]
+        for k, layer in enumerate(self.layers):
+            hk = states[k][:, :hi]
+            cur = torch.full((hi - lo,), layer.mask_id, dtype=torch.long, device=dev)
+            for r in range(rounds):
+                rev = torch.cat([codes[k + 1, :lo], cur])[None]
+                _, logits = layer(hk, codes[k, :hi][None], pos, None, attn, rev)
+                lg = logits[0, lo:hi].float()
+                masked = cur == layer.mask_id
+                probs = F.softmax(lg / max(temperature, 1e-5), -1)
+                if temperature > 0:
+                    if top_k > 0:
+                        lg = lg.masked_fill(lg < lg.topk(top_k, -1).values[..., -1:], -float("inf"))
+                    sample = torch.distributions.Categorical(logits=lg / temperature).sample()
+                else:
+                    sample = lg.argmax(-1)
+                conf = torch.where(masked, probs.gather(1, sample[:, None])[:, 0], torch.full_like(probs[:, 0], -1.0))
+                keep = int(math.floor((hi - lo) * math.cos(math.pi / 2 * (r + 1) / rounds)))
+                n_fix = int(masked.sum()) - keep
+                if n_fix > 0:
+                    idx = conf.topk(n_fix).indices
+                    cur[idx] = sample[idx]
+            codes[k + 1, lo:hi] = cur
+            st, _ = layer(hk, codes[k, :hi][None], pos, None, cattn, codes[k + 1, :hi][None])
+            states[k + 1][:, lo:hi] = st[:, lo:hi].to(states[k + 1].dtype)
+
     @torch.no_grad()
     def generate(self, h, semantic, block, rounds=4, temperature=0.0, top_k=0):
-        """semantic [T] codes of one utterance, h [T, dim] its backbone states -> codes [10, T]. Block by block (frames
-        of `block`), codebook by codebook; inside a block the frames of a codebook are unmasked over `rounds`
-        iterations (most confident first, cosine schedule), each seeing the decided codes of the earlier blocks and
-        of the frames revealed so far. Layer k's input state of a block is layer k-1's clean pass (all decided)."""
-        T, dev = semantic.shape[0], semantic.device
-        codes = torch.zeros(NUM_CODEBOOKS, T, dtype=torch.long, device=dev)
-        codes[0] = semantic
-        blk = torch.arange(T, device=dev) // block
-        states = [h[None]] + [None] * len(self.layers)  # clean input state of layer k for every decided frame
-        pos_all = torch.arange(T, device=dev)[None]
-        for b in range(int(blk[-1]) + 1 if T else 0):
-            lo, hi = b * block, min(T, (b + 1) * block)
-            for k, layer in enumerate(self.layers):
-                hk = states[k][:, :hi]
-                cur = torch.full((hi - lo,), layer.mask_id, dtype=torch.long, device=dev)
-                # context: decided frames of earlier blocks (block-causal among themselves) + the current block
-                L = lo + (hi - lo)
-                kind = torch.cat([torch.zeros(lo, dtype=torch.long, device=dev), torch.ones(hi - lo, dtype=torch.long, device=dev)])
-                bb = blk[:hi]
-                attn = ((bb[None, :, None] >= bb[None, None, :]) & (kind[None, None, :] == 0)) | \
-                       ((kind[None, :, None] == 1) & (kind[None, None, :] == 1))
-                attn = attn[:, None]
-                for r in range(rounds):
-                    rev = torch.cat([codes[k + 1, :lo], cur])[None]
-                    _, logits = layer(hk, codes[k, :hi][None], pos_all[:, :hi], None, attn, rev)
-                    lg = logits[0, lo:hi].float()
-                    masked = cur == layer.mask_id
-                    probs = F.softmax(lg / max(temperature, 1e-5), -1)
-                    if temperature > 0:
-                        if top_k > 0:
-                            lg = lg.masked_fill(lg < lg.topk(top_k, -1).values[..., -1:], -float("inf"))
-                        sample = torch.distributions.Categorical(logits=lg / temperature).sample()
-                    else:
-                        sample = lg.argmax(-1)
-                    conf = torch.where(masked, probs.gather(1, sample[:, None])[:, 0], torch.full_like(probs[:, 0], -1.0))
-                    keep = int(math.floor((hi - lo) * math.cos(math.pi / 2 * (r + 1) / rounds)))
-                    n_fix = int(masked.sum()) - keep
-                    if n_fix > 0:
-                        idx = conf.topk(n_fix).indices
-                        cur[idx] = sample[idx]
-                codes[k + 1, lo:hi] = cur
-                # clean pass of the decided frames: next layer's input state (earlier blocks are recomputed alike)
-                cattn = (bb[None, :, None] >= bb[None, None, :])[:, None]
-                st, _ = layer(hk, codes[k, :hi][None], pos_all[:, :hi], None, cattn, codes[k + 1, :hi][None])
-                if states[k + 1] is None:
-                    states[k + 1] = torch.zeros(1, T, st.shape[-1], dtype=st.dtype, device=dev)
-                states[k + 1][:, lo:hi] = st[:, lo:hi]
-        return codes
+        """semantic [T] codes of one utterance, h [T, dim] its backbone states -> codes [10, T], block by block"""
+        T = semantic.shape[0]
+        S = self.new_state(T, h.shape[-1], h.device, h.dtype)
+        S["codes"][0], S["states"][0][0] = semantic, h
+        for lo in range(0, T, block):
+            self.decode_block(S, lo, min(T, lo + block), block, rounds, temperature, top_k)
+        return S["codes"]
 
 
 class OmniFish(nn.Module):
