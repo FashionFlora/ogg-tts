@@ -109,10 +109,11 @@ class _Stream:
 @torch.no_grad()
 def blocks_cached(model, tok, prompt_codes, prompt_text, text, lang, block=16, steps=6, cfg=2.0, temperature=0.8,
                   max_frames=None, seed=0, before=(), after=(), speaker=None, quality=None, mtp_temperature=0.0,
-                  mtp_top_k=0, mtp_rounds=4):
+                  mtp_top_k=0, mtp_rounds=4, full_context=True):
     """block diffusion with KV caches (one batch row for the conditional and one for the CFG branch). Per block:
     unmask its semantic ids in `steps` iterations, run the MTP on it (semantic-only states), append it with all
-    10 codes to the cache as context of the later blocks. Yields (semantic ids of every frame so far, codes
+    10 codes (full_context, for models trained so) or its semantic ids only (default) to the cache as context of the
+    later blocks. Yields (semantic ids of every frame so far, codes
     [10, frames]) after each block; the last block holds END (or a PAD), or the safety cap is reached."""
     dev = next(model.parameters()).device
     g = torch.Generator(device=dev).manual_seed(seed)
@@ -161,17 +162,18 @@ def blocks_cached(model, tok, prompt_codes, prompt_text, text, lang, block=16, s
         yield clean, S["codes"][:, :lo + nb]
         if len(end):
             return
-        st.commit(full)
+        st.commit(full if full_context else full[:1].expand(of.NUM_CODEBOOKS, -1).clone().masked_fill(
+            torch.arange(of.NUM_CODEBOOKS, device=dev)[:, None] > 0, of.MASK_ID))  # semantic-only context
 
 
 @torch.no_grad()
 def generate_cached(model, tok, prompt_codes, prompt_text, text, lang, block=16, steps=6, cfg=2.0, temperature=0.8,
                     mtp_temperature=0.0, mtp_top_k=0, mtp_rounds=4, max_frames=None, seed=0, before=(), after=(),
-                    speaker=None, quality=None):
+                    speaker=None, quality=None, full_context=True):
     """whole utterance -> codes [10, speech frames]"""
     for clean, codes in blocks_cached(model, tok, prompt_codes, prompt_text, text, lang, block, steps, cfg,
                                       temperature, max_frames, seed, before, after, speaker, quality,
-                                      mtp_temperature, mtp_top_k, mtp_rounds):
+                                      mtp_temperature, mtp_top_k, mtp_rounds, full_context):
         pass
     return codes[:, :speech_frames(clean)].clone()
 

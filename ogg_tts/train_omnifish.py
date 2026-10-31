@@ -31,8 +31,8 @@ dominate; rounds are re-drawn every --reload-every steps, so all their audio sti
 Block diffusion (LLaDA2.0 / BD3-LM, see omnifish.py): prompt = first 0..30 % of the frames (no loss), or in
 --cross-prompt of the spans another 2-8 s line of the same speaker spoken first (its text first); the rest
 is the target - its semantic ids, then END and the Rainbow PAD cycle up to a multiple of the block size -
-present three times: clean with semantic ids only (the MTP's input), clean with all 10 codes (the context of
-later blocks), noisy; every noisy block is masked at its own uniform random ratio. 10 %
+present twice, clean (semantic ids only: the context of later blocks and the MTP's input) and noisy - with
+--full-context three times, a clean copy with all 10 codes as the context of later blocks; every noisy block is masked at its own uniform random ratio. 10 %
 unconditional (no text/language/prompt), language tag in 80 % of the rest, instruct = speaker token or "None".
 Gemini text (/data/dataset/build/gemini_text.parquet, make_gemini_text.py) replaces a sentence's text where it has one:
 inline audio tags ([sighing], [shouting], ...) plus the checked spoken-form transcript; spans with tags come up
@@ -343,20 +343,21 @@ class SpanDataset(IterableDataset):
                            return_tensors="pt").input_ids
             prefix = torch.cat([style, txt], 1).repeat(C, 1)
         S, ctx = prefix.shape[1], prefix.shape[1] + plen
-        ids = torch.cat([prefix, audio[:, :plen], clean, full, noisy], 1)
+        copies = [clean, full, noisy] if a.full_context else [clean, noisy]
+        ids = torch.cat([prefix, audio[:, :plen], *copies], 1)
         L = ids.shape[1]
         sem = torch.full((L,), -100)
-        sem[ctx + 2 * nt:][m] = tgt[m]
+        sem[ctx + (len(copies) - 1) * nt:][m] = tgt[m]
         codes = torch.zeros(C, L, dtype=torch.long)
         codes[:, ctx:ctx + n] = audio[:, plen:]
         amask = torch.ones(L, dtype=torch.bool)
         amask[:S] = False
         tmask = torch.zeros(L, dtype=torch.bool)
         tmask[ctx:ctx + n] = True
-        kind = torch.cat([torch.zeros(ctx, dtype=torch.long), torch.ones(nt, dtype=torch.long), torch.full((nt,), 3),
-                          torch.full((nt,), 2)])
-        block = torch.cat([torch.zeros(ctx, dtype=torch.long), blk, blk, blk])
-        pos = torch.cat([torch.arange(ctx), ctx + torch.arange(nt), ctx + torch.arange(nt), ctx + torch.arange(nt)])
+        kinds = [1, 3, 2] if a.full_context else [1, 2]
+        kind = torch.cat([torch.zeros(ctx, dtype=torch.long)] + [torch.full((nt,), k) for k in kinds])
+        block = torch.cat([torch.zeros(ctx, dtype=torch.long)] + [blk] * len(kinds))
+        pos = torch.cat([torch.arange(ctx)] + [ctx + torch.arange(nt)] * len(kinds))
         return ids, sem, codes, amask, tmask, block, kind, pos
 
     def __iter__(self):
@@ -419,6 +420,8 @@ def main():
                     help="weights of speaker token + prompt / token only / prompt only (speakers with a token)")
     ap.add_argument("--dialogue", type=float, default=0.5,
                     help="share of the scene windows used (multispeaker books; 0 = off)")
+    ap.add_argument("--full-context", action="store_true",
+                    help="the backbone sees all 10 codes of earlier blocks (3 target copies); off: semantic ids only")
     ap.add_argument("--cross-prompt", type=float, default=0.5,
                     help="share of the spans whose prompt is another 2-8 s line of the speaker (not the span's start)")
     ap.add_argument("--tag-oversample", type=int, default=3, help="spans with inline tags this many times")

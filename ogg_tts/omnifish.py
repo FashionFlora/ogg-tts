@@ -69,15 +69,21 @@ def dialogue_text(turns):
 
 def block_attention(kind, block):
     """kind [B, L] (0 context, 1 clean target with semantic ids only, 3 clean target with all 10 codes, 2 noisy
-    target, -1 padding), block [B, L] -> [B, 1, L, L]. Context sees context; full block b (3) sees context and
+    target, -1 padding), block [B, L] -> [B, 1, L, L]. Without kind 3 (the default, --full-context off): context
+    sees context, clean block b sees clean blocks <= b, noisy block b sees clean blocks < b and itself; earlier
+    blocks are seen by their semantic ids only. With kind 3: context sees context; full block b (3) sees context and
     full blocks <= b; semantic-only block b (1, the MTP's input states) and noisy block b (2) see context, full
     blocks < b and themselves. So a block's semantic is predicted from everything decided before it, residual
     codes of earlier blocks included, and the MTP never sees the codes it predicts. Padding rows see every real
     position (no empty row)."""
     kq, kk, bq, bk = kind[:, :, None], kind[:, None, :], block[:, :, None], block[:, None, :]
-    att = ((kk == 0) & (kq >= 0)) | ((kq == 3) & (kk == 3) & (bk <= bq)) \
-        | ((kq == 1) & (kk == 3) & (bk < bq)) | ((kq == 1) & (kk == 1) & (bk == bq)) \
-        | ((kq == 2) & (kk == 3) & (bk < bq)) | ((kq == 2) & (kk == 2) & (bk == bq)) | ((kq == -1) & (kk >= 0))
+    if (kind == 3).any():  # full-code context (3 copies)
+        att = ((kk == 0) & (kq >= 0)) | ((kq == 3) & (kk == 3) & (bk <= bq)) \
+            | ((kq == 1) & (kk == 3) & (bk < bq)) | ((kq == 1) & (kk == 1) & (bk == bq)) \
+            | ((kq == 2) & (kk == 3) & (bk < bq)) | ((kq == 2) & (kk == 2) & (bk == bq)) | ((kq == -1) & (kk >= 0))
+    else:  # semantic-only context (2 copies): clean block b sees clean blocks <= b, noisy block b clean < b and itself
+        att = ((kk == 0) & (kq >= 0)) | ((kq == 1) & (kk == 1) & (bk <= bq)) \
+            | ((kq == 2) & (kk == 1) & (bk < bq)) | ((kq == 2) & (kk == 2) & (bk == bq)) | ((kq == -1) & (kk >= 0))
     return att[:, None]
 
 
