@@ -28,7 +28,8 @@ joined, one per game+language) appended to the instruct in --quality-ratio of th
 Speaker balance: each index round keeps a span with probability min(1, --speaker-cap / hours of its global
 speaker) (ECAPA2 groups, /data/dataset/build/speaker_map.parquet), so the most recorded narrators cannot
 dominate; rounds are re-drawn every --reload-every steps, so all their audio still comes up over time.
-Block diffusion (LLaDA2.0 / BD3-LM, see omnifish.py): prompt = first 0..30 % of the frames (no loss); the rest
+Block diffusion (LLaDA2.0 / BD3-LM, see omnifish.py): prompt = first 0..30 % of the frames (no loss), or in
+--cross-prompt of the spans another 2-8 s line of the same speaker spoken first (its text first); the rest
 is the target - its semantic ids, then END and the Rainbow PAD cycle up to a multiple of the block size -
 present three times: clean with semantic ids only (the MTP's input), clean with all 10 codes (the context of
 later blocks), noisy; every noisy block is masked at its own uniform random ratio. 10 %
@@ -137,7 +138,8 @@ def splice(rows):
     return tuple(merged)
 
 
-def build_spans(idx, max_sentences, max_frames, max_gap, max_skip, seed=0, dialogue=0.0, dialogue_prompt=0.0):
+def build_spans(idx, max_sentences, max_frames, max_gap, max_skip, seed=0, dialogue=0.0, dialogue_prompt=0.0,
+                cross_prompt=0.0):
     """(tokens file, ((start, end), ...) frame segments, text, lang, global speaker, (2 sentences before, 2 after))
     for spans of 1..max_sentences kept
     sentences of one speaker that follow each other directly in the book (a line of another speaker, or a dropped
@@ -170,6 +172,8 @@ def build_spans(idx, max_sentences, max_frames, max_gap, max_skip, seed=0, dialo
                                     dialogue_prompt)
         for _, sg in g.groupby("speaker", sort=False):
             rows = list(sg.itertuples(index=False))
+            # cross prompts: other 2..8 s lines of this speaker in this book / game
+            pool = [r for r in rows if 2 * FPS <= r.end_frame - r.start_frame <= 8 * FPS] if cross_prompt > 0 else []
             i = 0
             while i < len(rows):
                 k = 1 if game else rng.randint(1, max_sentences)
@@ -184,8 +188,18 @@ def build_spans(idx, max_sentences, max_frames, max_gap, max_skip, seed=0, dialo
                     total += pause + n
                 if total <= max_frames:
                     first, last = rows[i], rows[i + len(seg) - 1]
-                    spans.append((tok, splice(seg), " ".join(text), first.lang, first.global_speaker,
-                                  ((first.b2, first.b1), (last.a1, last.a2)), first.spk_token, first.q_token))
+                    span = (tok, splice(seg), " ".join(text), first.lang, first.global_speaker,
+                            ((first.b2, first.b1), (last.a1, last.a2)), first.spk_token, first.q_token)
+                    if pool and first.spk_token and rng.random() < cross_prompt:
+                        # the prompt is another line of the speaker (as at inference: a separate reference clip),
+                        # spoken first, its text before the span's text; the whole span is the target
+                        used = {r.pos for r in seg}
+                        p = rng.choice(pool)
+                        plen = int(p.end_frame - p.start_frame)
+                        if p.pos not in used and total + plen <= max_frames:
+                            span = span[:1] + (((int(p.start_frame), int(p.end_frame)),) + span[1],
+                                               f"{p.text.strip()} {span[2]}") + span[3:] + (plen,)
+                    spans.append(span)
                 i += len(seg)
     return spans
 
@@ -291,6 +305,8 @@ class SpanDataset(IterableDataset):
             mode, instruct = "prompt", ""
         else:
             mode = "both" if spk_token.endswith("_x") else rng.choices(("both", "token", "prompt"), weights=a.speaker_mode)[0]
+            if fixed and mode == "token":  # a cross-prompt span keeps its prompt
+                mode = "both"
             instruct = f"speaker:{spk_token}"
         instruct = "" if mode == "prompt" else instruct
         # recording quality (one id per book / game+language), in --quality-ratio of the samples
@@ -403,6 +419,8 @@ def main():
                     help="weights of speaker token + prompt / token only / prompt only (speakers with a token)")
     ap.add_argument("--dialogue", type=float, default=0.5,
                     help="share of the scene windows used (multispeaker books; 0 = off)")
+    ap.add_argument("--cross-prompt", type=float, default=0.5,
+                    help="share of the spans whose prompt is another 2-8 s line of the speaker (not the span's start)")
     ap.add_argument("--tag-oversample", type=int, default=3, help="spans with inline tags this many times")
     ap.add_argument("--tag-drop", type=float, default=0.25, help="share of the samples with their tags stripped")
     ap.add_argument("--dialogue-prompt", type=float, default=0.5,
@@ -488,9 +506,9 @@ def main():
         # dialogue scenes only once the multispeaker lines are checked (speaker_mismatch.parquet)
         dlg = args.dialogue if os.path.exists("/data/dataset/build/speaker_mismatch.parquet") else 0.0
         tr = build_spans(tr_idx, args.max_sentences, max_frames, max_gap, max_skip, seed=step, dialogue=dlg,
-                         dialogue_prompt=args.dialogue_prompt)
+                         dialogue_prompt=args.dialogue_prompt, cross_prompt=args.cross_prompt)
         va = build_spans(va_idx, args.max_sentences, max_frames, max_gap, max_skip, 1, dialogue=dlg,
-                         dialogue_prompt=args.dialogue_prompt)
+                         dialogue_prompt=args.dialogue_prompt, cross_prompt=args.cross_prompt)
         all_hours = sum(span_frames(x) for x in tr) / FPS / 3600
         tr = balance_speakers(tr, args.speaker_cap, seed=step)
         if args.max_train_spans:
