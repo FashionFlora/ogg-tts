@@ -14,7 +14,7 @@ of their language.
 Text context (audiobooks): up to 2 sentences before the span and up to 2 after it (any speaker, text only, never
 spoken), as <|object_ref_start|>before<|object_ref_end|> ... <|box_start|>after<|box_end|> around the text; how many
 is drawn per sample (--context-before / --context-after probabilities), so the model also works without it.
-Speaker token (instruct field): speakers with >= 30 min (/data/dataset/build/speaker_tokens.json, frozen names)
+Speaker token (instruct field): global spk_N IDs for speakers with >= 8 min, with language supplied separately
 get "speaker:pl_3"; everyone else - small speakers, game extras - the bag "speaker:pl_x". Per
 sample (--speaker-mode weights): token + prompt / token only (no prompt frames) / prompt only (instruct None);
 bag samples always carry their bag token and their prompt.
@@ -36,7 +36,10 @@ present twice, clean (semantic ids only: the context of later blocks and the MTP
 unconditional (no text/language/prompt), language tag in 80 % of the rest, instruct = speaker token or "None".
 Gemini text (/data/dataset/build/gemini_text.parquet, make_gemini_text.py) replaces a sentence's text where it has one:
 inline audio tags ([sighing], [shouting], ...) plus the checked spoken-form transcript; spans with tags come up
---tag-oversample times, and in --tag-drop of the samples the tags are stripped, so they stay optional.
+--tag-oversample times (copies) or, with --tag-windows, in that many different windows; in --tag-drop of the
+samples the tags are stripped, so they stay optional.
+Each used speaker change gives --dialogue-windows different scenes (other length / offset / prompts, no copies):
+scenes are rare and the hardest to learn.
 The block size follows --block-schedule (large blocks first, as LLaDA2.0's decay to small blocks).
 Tokens are memory-mapped, never loaded.
 """
@@ -104,8 +107,8 @@ def load_index(tokens_dir, val_books):
         x = idx.merge(pd.read_parquet(mm).assign(odd=True), on=["parquet", "row"], how="left").odd.fillna(False).to_numpy()
         idx.loc[x, "global_speaker"] = idx.lang[x] + ":speaker_x"
         idx.loc[x, "speaker"] = "x" + idx.order[x].astype(str)
-    tokens = json.load(open("/data/dataset/build/speaker_tokens.json"))
-    idx["spk_token"] = idx.global_speaker.map(tokens).fillna(idx.lang + "_x")
+    tokens = json.load(open("/data/dataset/build/speaker_tokens_global.json"))
+    idx["spk_token"] = idx.global_speaker.map(tokens).fillna("")
     idx.loc[x, "spk_token"] = ""
     quality = json.load(open("/data/dataset/build/quality_tokens.json"))
     idx["q_token"] = pd.Series(make_quality_tokens.quality_key(idx), index=idx.index).map(quality).fillna("")
@@ -139,14 +142,15 @@ def splice(rows):
 
 
 def build_spans(idx, max_sentences, max_frames, max_gap, max_skip, seed=0, dialogue=0.0, dialogue_prompt=0.0,
-                cross_prompt=0.0):
+                cross_prompt=0.0, dialogue_windows=1, tag_windows=1, dialogue_mixed=0.0, prompt_min_frames=0):
     """(tokens file, ((start, end), ...) frame segments, text, lang, global speaker, (2 sentences before, 2 after))
     for spans of 1..max_sentences kept
     sentences of one speaker that follow each other directly in the book (a line of another speaker, or a dropped
     line, ends the window: nothing is skipped, the audio stays continuous); every segment but the last carries the
     sentence's own following pause (<= max_gap, longer ones lose their middle). max_skip is unused.
     dialogue > 0 (multispeaker books): also windows of 1..max_sentences consecutive lines as they come, each kept with
-    probability `dialogue`: one voice -> an ordinary span, several -> a scene with turn markers ("dialogue")."""
+    probability `dialogue`: one voice -> an ordinary span, several -> a scene with turn markers ("dialogue").
+    tag_windows > 1: every sentence with inline tags also comes up in tag_windows - 1 other windows."""
     rng = random.Random(seed)
     spans = []
     for tok, g in idx.sort_values(["start_frame", "order"]).groupby("tokens", sort=False):  # time order: continuity
@@ -162,21 +166,23 @@ def build_spans(idx, max_sentences, max_frames, max_gap, max_skip, seed=0, dialo
                      tail_end=e + p)
         # text context: the book's neighbouring sentences (any speaker); none for games (line order is no dialogue)
         t = g.text.fillna("").map(strip_tags)  # context is plain text
-        g = g.assign(**({k: "" for k in ("b2", "b1", "a1", "a2")} if game else
+        g = g.assign(**({k: "" for k in ("b2", "b1", "a1", "a2", "a3", "a4", "a5")} if game else
                         dict(b2=t.shift(2, fill_value=""), b1=t.shift(1, fill_value=""),
-                             a1=t.shift(-1, fill_value=""), a2=t.shift(-2, fill_value=""))))
+                     a1=t.shift(-1, fill_value=""), a2=t.shift(-2, fill_value=""),
+                     a3=t.shift(-3, fill_value=""), a4=t.shift(-4, fill_value=""),
+                     a5=t.shift(-5, fill_value=""))))
         g = g.assign(pos=np.arange(len(g)))  # position among all the book's lines: consecutive lines in a scene
+        book_rows = {int(r.pos): r for r in g.itertuples(index=False)
+                 if bool(r.keep) and int(r.end_frame) > int(r.start_frame)}
+        book_positions = np.asarray(sorted(book_rows), dtype=np.int64)
         g = g[g.keep & (g.end_frame > g.start_frame)]
         if dialogue > 0 and not game and "multispeaker" in g.book_id.iloc[0]:
             spans += dialogue_spans(tok, list(g.itertuples(index=False)), rng, dialogue, max_sentences, max_frames,
-                                    dialogue_prompt)
+                                    dialogue_prompt, dialogue_windows, dialogue_mixed)
         for _, sg in g.groupby("speaker", sort=False):
             rows = list(sg.itertuples(index=False))
-            # cross prompts: other 2..8 s lines of this speaker in this book / game
-            pool = [r for r in rows if 2 * FPS <= r.end_frame - r.start_frame <= 8 * FPS] if cross_prompt > 0 else []
-            i = 0
-            while i < len(rows):
-                k = 1 if game else rng.randint(1, max_sentences)
+            def window(i, k):
+                """up to k continuous sentences from rows[i] -> (span or None, sentences used)"""
                 seg, text, total = [], [], 0
                 for r in rows[i:i + k]:
                     n = r.end_frame - r.start_frame
@@ -186,34 +192,99 @@ def build_spans(idx, max_sentences, max_frames, max_gap, max_skip, seed=0, dialo
                     seg.append(r)
                     text.append(r.text.strip())
                     total += pause + n
-                if total <= max_frames:
-                    first, last = rows[i], rows[i + len(seg) - 1]
-                    span = (tok, splice(seg), " ".join(text), first.lang, first.global_speaker,
-                            ((first.b2, first.b1), (last.a1, last.a2)), first.spk_token, first.q_token)
-                    if pool and first.spk_token and rng.random() < cross_prompt:
-                        # the prompt is another line of the speaker (as at inference: a separate reference clip),
-                        # spoken first, its text before the span's text; the whole span is the target
-                        used = {r.pos for r in seg}
-                        p = rng.choice(pool)
-                        plen = int(p.end_frame - p.start_frame)
-                        if p.pos not in used and total + plen <= max_frames:
-                            span = span[:1] + (((int(p.start_frame), int(p.end_frame)),) + span[1],
-                                               f"{p.text.strip()} {span[2]}") + span[3:] + (plen,)
+                if total > max_frames:
+                    return None, len(seg)
+                first, last = rows[i], rows[i + len(seg) - 1]
+                left_positions = []
+                for pos in range(int(first.pos) - 1, max(-1, int(first.pos) - max_sentences - 1), -1):
+                    if pos not in book_rows:
+                        break
+                    left_positions.append(pos)
+                left_positions.reverse()
+                left_context = tuple((str(book_rows[int(pos)].text).strip(),
+                                      int(book_rows[int(pos)].start_frame),
+                                      int(book_rows[int(pos)].end_frame)) for pos in left_positions)
+                after_positions = []
+                for pos in range(int(last.pos) + 1, int(last.pos) + max_sentences + 1):
+                    if pos not in book_rows:
+                        break
+                    after_positions.append(pos)
+                after_context = tuple(str(book_rows[pos].text).strip() for pos in after_positions)
+                span = (tok, splice(seg), " ".join(text), first.lang, first.global_speaker,
+                        ((first.b2, first.b1), after_context),
+                    first.spk_token, first.q_token, left_context)
+                if prompt_min_frames and rng.random() < cross_prompt:
+                    prompt_rows, speech = [], 0
+                    if game:  # game lines have no book order: other lines of the character as the reference
+                        for p in reversed(rows[:i]):
+                            prompt_rows.insert(0, p)
+                            speech += int(p.end_frame - p.start_frame)
+                            if speech >= prompt_min_frames:
+                                break
+                        prompt_segments = tuple((int(p.start_frame), int(p.end_frame)) for p in prompt_rows)
+                    else:  # history: the speaker's lines before the target, going left (other speakers' lines may lie
+                        # between: the text context tells the model) until >= prompt_min_frames of speech
+                        for p in reversed(rows[:i]):
+                            prompt_rows.insert(0, p)
+                            speech += int(p.end_frame - p.start_frame)
+                            if speech >= prompt_min_frames:
+                                break
+                        # each line with its own pause (as recorded), the last one's too; not glued edge to edge
+                        segs = list(splice(prompt_rows)) if prompt_rows else []
+                        for a_, b_ in (pause_pieces(prompt_rows[-1]) if prompt_rows else ()):
+                            if b_ <= a_:
+                                continue
+                            if segs and segs[-1][1] == a_:
+                                segs[-1] = (segs[-1][0], b_)
+                            else:
+                                segs.append((a_, b_))
+                        prompt_segments = tuple(segs)
+                    prompt_frames = sum(b_ - a_ for a_, b_ in prompt_segments)
+                    if speech >= prompt_min_frames and total + prompt_frames <= max_frames:
+                        prompt_text = " ".join(p.text.strip() for p in prompt_rows)
+                        # every earlier line once: a prompt line is not left context again (the context keeps the
+                        # other lines of its window: earlier ones, other speakers' lines between)
+                        in_prompt = {int(p.start_frame) for p in prompt_rows}
+                        span = span[:8] + (tuple(x for x in span[8] if x[1] not in in_prompt),)
+                        span = span[:1] + (prompt_segments + span[1],
+                                           f"{prompt_text} {span[2]}") + span[3:] + (prompt_frames,)
+                return span, len(seg)
+
+            i = 0
+            while i < len(rows):
+                span, n = window(i, 1 if game else rng.randint(1, max_sentences))
+                if span:
                     spans.append(span)
-                i += len(seg)
+                i += n
+            # a sentence with inline tags also comes up in tag_windows - 1 other windows: another length, its own
+            # place in the window, other neighbours and prompt (not a copy of the same span)
+            for j in ([j for j, r in enumerate(rows) if isinstance(r.text, str) and TAG_RE.search(r.text)] if tag_windows > 1 else []):
+                for _ in range(tag_windows - 1):
+                    k = 1 if game else rng.randint(1, max_sentences)
+                    i = max(0, j - rng.randint(0, k - 1))
+                    while i < j and any(rows[t + 1].pos != rows[t].pos + 1 for t in range(i, j)):  # continuous up to it
+                        i += 1
+                    span, n = window(i, k)
+                    if span and i + n > j:  # the window really holds the tagged sentence
+                        spans.append(span)
     return spans
 
 
-def dialogue_spans(tok, rows, rng, keep, max_lines, max_frames, prompted=0.0):
+def dialogue_spans(tok, rows, rng, keep, max_lines, max_frames, prompted=0.0, windows=1, mixed=0.0):
     """scenes around speaker changes: every change between two consecutive kept lines (no line of the book
     skipped) of speakers with an own token (bag and speaker_x lines have no voice to name) is, with probability
     `keep`, the centre of a window of 2..max_lines consecutive lines, the change at a random place inside it; the
     window grows to the left and right only over such lines. Each line keeps its own pause (at most max_gap,
     middle cut), the last none. Text with turn markers, instruct "dialogue".
     `prompted` of the scenes instead name their voices S1, S2, ... (first appearance) and carry one prompt per voice:
-    another 2..6 s line of that speaker from the same book, outside the window, spoken first; text
-    "<|quad_start|>S1<|quad_end|>prompt line <|quad_start|>S2<|quad_end|>prompt line" + the scene with S markers,
-    instruct "dialogue", spk_token "dialogue_p" and the prompt length in frames as 9th field."""
+    another 2..6 s line of that speaker from the same book, outside the window; text = the scene with S markers,
+    instruct "dialogue", spk_token "dialogue_p", the prompts' total frames as 9th field and the voice definitions
+    ((name, transcript, frames), ...) as 10th: in the sequence each voice is defined on its own, its name and
+    transcript right before its audio, then the scene (see SpanDataset.process).
+    `windows` scenes per used change, each with its own length / offset / prompt draw (an identical window is
+    only kept again as a prompted scene). `mixed` of the prompted scenes with several voices leave 1..n-1 voices
+    undefined: those are named by their speaker ID in the turn markers (as in the ID-only scenes), the rest S1, S2, ...
+    with definitions."""
     named = lambda r: bool(r.spk_token) and not r.spk_token.endswith("_x")
     linked = lambda a, b: named(a) and named(b) and b.pos == a.pos + 1  # a scene may run from line a to line b
     pool = {}
@@ -224,38 +295,47 @@ def dialogue_spans(tok, rows, rng, keep, max_lines, max_frames, prompted=0.0):
     for j in range(1, len(rows)):
         if not linked(rows[j - 1], rows[j]) or rows[j - 1].spk_token == rows[j].spk_token or rng.random() >= keep:
             continue
-        k = rng.randint(2, max_lines)
-        left = rng.randint(0, k - 2)  # lines before rows[j - 1]
-        lo, hi = j - 1, j
-        while lo > 0 and j - 1 - lo < left and linked(rows[lo - 1], rows[lo]):
-            lo -= 1
-        while hi + 1 < len(rows) and hi - lo + 1 < k and linked(rows[hi], rows[hi + 1]):
-            hi += 1
-        seg = rows[lo:hi + 1]
-        total = sum(r.end_frame - r.start_frame for r in seg) + sum(pause_len(r) for r in seg[:-1])
-        if total > max_frames:
-            continue
-        turns = [(r.spk_token, r.text.strip()) for r in seg]
-        merged = splice(seg)
-        first, last = seg[0], seg[-1]
-        ctx = ((first.b2, first.b1), (last.a1, last.a2))
-        scene = None
-        if rng.random() < prompted:
-            voices = list(dict.fromkeys(t for t, _ in turns))
-            used = {r.pos for r in seg}
-            picks = [[c for c in pool.get(v, []) if c.pos not in used] for v in voices]
-            if all(picks):
-                picks = [rng.choice(p) for p in picks]
-                plen = sum(int(p.end_frame - p.start_frame) for p in picks)
-                if total + plen <= max_frames:
-                    name = {v: f"S{n + 1}" for n, v in enumerate(voices)}
-                    ptext = " ".join(f"<|quad_start|>{name[v]}<|quad_end|>{p.text.strip()}" for v, p in zip(voices, picks))
-                    stext = of.dialogue_text([(name[v], t) for v, t in turns])
-                    psegs = tuple((int(p.start_frame), int(p.end_frame)) for p in picks)
-                    scene = (tok, psegs + merged, f"{ptext} {stext}", first.lang, f"dialogue:{tok}", ctx,
-                             "dialogue_p", first.q_token, plen)
-        out.append(scene or (tok, merged, of.dialogue_text(turns), first.lang, f"dialogue:{tok}", ctx,
-                             "dialogue", first.q_token))
+        seen = set()
+        for _ in range(windows):  # different windows around this change (length, offset, prompts)
+            k = rng.randint(2, max_lines)
+            left = rng.randint(0, k - 2)  # lines before rows[j - 1]
+            lo, hi = j - 1, j
+            while lo > 0 and j - 1 - lo < left and linked(rows[lo - 1], rows[lo]):
+                lo -= 1
+            while hi + 1 < len(rows) and hi - lo + 1 < k and linked(rows[hi], rows[hi + 1]):
+                hi += 1
+            if (lo, hi) in seen and windows > 1 and rng.random() >= prompted:
+                continue  # the same window again: only as a prompted scene (other prompts)
+            seen.add((lo, hi))
+            seg = rows[lo:hi + 1]
+            total = sum(r.end_frame - r.start_frame for r in seg) + sum(pause_len(r) for r in seg[:-1])
+            if total > max_frames:
+                continue
+            turns = [(r.spk_token, r.text.strip()) for r in seg]
+            merged = splice(seg)
+            first, last = seg[0], seg[-1]
+            ctx = ((first.b2, first.b1), (last.a1, last.a2))
+            scene = None
+            if rng.random() < prompted:
+                voices = list(dict.fromkeys(t for t, _ in turns))
+                by_id = set()  # mixed scenes: some voices go by their speaker ID (no definition), the others are defined
+                if mixed > 0 and len(voices) > 1 and rng.random() < mixed:
+                    by_id = set(rng.sample(voices, rng.randint(1, len(voices) - 1)))
+                defined = [v for v in voices if v not in by_id]
+                used = {r.pos for r in seg}
+                picks = [[c for c in pool.get(v, []) if c.pos not in used] for v in defined]
+                if all(picks):
+                    picks = [rng.choice(p) for p in picks]
+                    plen = sum(int(p.end_frame - p.start_frame) for p in picks)
+                    if total + plen <= max_frames:
+                        name = {v: f"S{n + 1}" for n, v in enumerate(defined)} | {v: v for v in by_id}
+                        defs = tuple((name[v], p.text.strip(), int(p.end_frame - p.start_frame)) for v, p in zip(defined, picks))
+                        stext = of.dialogue_text([(name[v], t) for v, t in turns])
+                        psegs = tuple((int(p.start_frame), int(p.end_frame)) for p in picks)
+                        scene = (tok, psegs + merged, stext, first.lang, f"dialogue:{tok}", ctx,
+                                 "dialogue_p", first.q_token, plen, defs)
+            out.append(scene or (tok, merged, of.dialogue_text(turns), first.lang, f"dialogue:{tok}", ctx,
+                                 "dialogue", first.q_token))
     return out
 
 
@@ -287,10 +367,16 @@ class SpanDataset(IterableDataset):
     def process(self, span, rng):
         """-> ids [10, L], semantic labels, codes [10, L], audio mask, MTP target mask, MTP block, kind, block,
         positions; layout [style + text][prompt][clean target, semantic ids][clean target, all 10 codes][noisy
-        target], kind 0 / 0 / 1 / 3 / 2 (see omnifish.block_attention)"""
-        name, segments, text, lang, _, (before, after), spk_token, q_token, *fixed = span  # fixed: prompt frames of a "dialogue_p" scene
+        target], kind 0 / 0 / 1 / 3 / 2 (see omnifish.block_attention); a prompted scene's context is
+        [style][S1: transcript][S1 audio][S2: transcript][S2 audio]...[scene text]"""
+        name, segments, text, lang, _, (before, after), spk_token, q_token, *extra = span
+        has_left_context = bool(extra and isinstance(extra[0], tuple))
+        left_context = extra[0] if has_left_context else ()
+        fixed = extra[1:] if has_left_context else extra  # optional cross-prompt fields
+        defs = fixed[1] if len(fixed) > 1 else ()  # "dialogue_p": ((name, transcript, frames), ...)
         if rng.random() < self.args.tag_drop:  # tags stay optional: the same text without them
             text = strip_tags(text)
+            defs = tuple((v, strip_tags(t), f) for v, t, f in defs)
         t = self.tokens(name)
         audio = torch.from_numpy(np.concatenate([np.asarray(t[:, s:e], dtype=np.int64) for s, e in segments], 1))  # [10, T]
         a, T, B, C = self.args, audio.shape[1], self.args.block_size, of.NUM_CODEBOOKS
@@ -301,19 +387,19 @@ class SpanDataset(IterableDataset):
             mode, instruct = "token", "dialogue"
         elif spk_token == "dialogue_p":  # voices S1, S2, ... from their prompts
             mode, instruct = "fixed", "dialogue"
-        elif not spk_token:  # speaker_x line (voice does not match its label): prompt only
+        elif not spk_token:  # no speaker identity: prompt only
             mode, instruct = "prompt", ""
         else:
-            mode = "both" if spk_token.endswith("_x") else rng.choices(("both", "token", "prompt"), weights=a.speaker_mode)[0]
-            if fixed and mode == "token":  # a cross-prompt span keeps its prompt
-                mode = "both"
+            mode = rng.choices(("both", "token", "prompt"), weights=a.speaker_mode)[0]
             instruct = f"speaker:{spk_token}"
         instruct = "" if mode == "prompt" else instruct
         # recording quality (one id per book / game+language), in --quality-ratio of the samples
-        if q_token and rng.random() < a.quality_ratio:
+        # always with a speaker ID (ID only, ID + prompt, ID dialogue): the ID's recording; prompt-only samples
+        # (any voice, also from outside the data) keep it optional
+        if q_token and mode in ("token", "both") and rng.random() < a.quality_ratio:
             instruct = f"{instruct} quality:{q_token}".strip()
         instruct = "None" if drop_cond or not instruct else instruct
-        plen = fixed[0] if fixed else 0 if drop_cond or mode == "token" else int(T * rng.uniform(*a.prompt_ratio))
+        plen = 0 if drop_cond or mode == "token" else fixed[0] if fixed else int(T * rng.uniform(*a.prompt_ratio))
         language = lang if (not drop_cond and rng.random() < a.language_ratio) else "None"
         # target: speech, END, PAD cycle to the block boundary
         n = T - plen
@@ -334,31 +420,66 @@ class SpanDataset(IterableDataset):
         noisy[0][m] = of.MASK_ID
         if drop_cond:
             prefix = torch.zeros(C, 0, dtype=torch.long)
+            parts = []
         else:
             style = self.tok(f"<|lang_start|>{language}<|lang_end|><|instruct_start|>{instruct}<|instruct_end|>",
-                             return_tensors="pt").input_ids
-            nb = rng.choices((0, 1, 2), weights=a.context_before)[0]
-            na = rng.choices((0, 1, 2), weights=a.context_after)[0]
-            txt = self.tok(of.context_text(text, [x for x in before[2 - nb:] if x], [x for x in after[:na] if x]),
-                           return_tensors="pt").input_ids
-            prefix = torch.cat([style, txt], 1).repeat(C, 1)
-        S, ctx = prefix.shape[1], prefix.shape[1] + plen
+                             return_tensors="pt").input_ids.repeat(C, 1)
+            context_sentences = getattr(a, "context_sentences", 0)
+            selected_left = left_context[-context_sentences:] if context_sentences else ()
+            selected_after = [x for x in after[:context_sentences] if x]
+            parts = [(style, False)]
+            if selected_left:
+                left_text = " ".join(x[0] for x in selected_left)
+                left_ids = self.tok(f"<|object_ref_start|>{left_text}<|object_ref_end|>",
+                                    return_tensors="pt").input_ids.repeat(C, 1)
+                left_semantic = [torch.from_numpy(np.asarray(self.tokens(name)[0, start:end], dtype=np.int64))
+                                 for _, start, end in selected_left]
+                left_codes = torch.full((C, sum(x.numel() for x in left_semantic)), of.MASK_ID, dtype=torch.long)
+                left_codes[0] = torch.cat(left_semantic)
+                parts.extend(((left_ids, False), (left_codes, True)))
+            target_ids = self.tok(of.context_text(text, (), selected_after), return_tensors="pt").input_ids.repeat(C, 1)
+            parts.append((target_ids, False))
+        if defs and not drop_cond:  # [style][S1: transcript][S1 audio][S2: transcript][S2 audio]...[scene text]
+            parts, off = [(style.repeat(C, 1), False)], 0
+            for v, t_, f in defs:
+                parts += [(self.tok(f"<|quad_start|>{v}<|quad_end|>{t_}", return_tensors="pt").input_ids.repeat(C, 1), False),
+                          (audio[:, off:off + f], True)]
+                off += f
+            parts.append((txt.repeat(C, 1), False))
+        else:  # [style][left text + semantic audio]...[target + right text][optional prompt]
+            if drop_cond:
+                parts = [(prefix, False)]
+            if plen:
+                parts.append((audio[:, :plen], True))
+        context = torch.cat([x for x, _ in parts], 1)
+        ctx_audio = torch.cat([torch.full((x.shape[1],), f, dtype=torch.bool) for x, f in parts])
+        ctx = context.shape[1]
         copies = [clean, full, noisy] if a.full_context else [clean, noisy]
-        ids = torch.cat([prefix, audio[:, :plen], *copies], 1)
+        ids = torch.cat([context, *copies], 1)
         L = ids.shape[1]
         sem = torch.full((L,), -100)
         sem[ctx + (len(copies) - 1) * nt:][m] = tgt[m]
         codes = torch.zeros(C, L, dtype=torch.long)
         codes[:, ctx:ctx + n] = audio[:, plen:]
+        # the MTP sees the prompt (its last plen context frames, all 10 codes) as decided frames before the target:
+        # block -1, no loss; the speaker's fine detail (deep codebooks) can be read from it
+        mtp_prompt = plen if plen and not (defs and not drop_cond) and getattr(a, "mtp_prompt", True) else 0
+        if mtp_prompt:
+            codes[:, ctx - plen:ctx] = audio[:, :plen]
         amask = torch.ones(L, dtype=torch.bool)
-        amask[:S] = False
+        amask[:ctx] = ctx_audio
         tmask = torch.zeros(L, dtype=torch.bool)
         tmask[ctx:ctx + n] = True
+        if mtp_prompt:
+            tmask[ctx - plen:ctx] = True
         kinds = [1, 3, 2] if a.full_context else [1, 2]
         kind = torch.cat([torch.zeros(ctx, dtype=torch.long)] + [torch.full((nt,), k) for k in kinds])
         block = torch.cat([torch.zeros(ctx, dtype=torch.long)] + [blk] * len(kinds))
         pos = torch.cat([torch.arange(ctx)] + [ctx + torch.arange(nt)] * len(kinds))
-        return ids, sem, codes, amask, tmask, block, kind, pos
+        mblock = block.clone()  # MTP block index: the prompt frames are block -1
+        if mtp_prompt:
+            mblock[ctx - plen:ctx] = -1
+        return ids, sem, codes, amask, tmask, block, kind, pos, mblock
 
     def __iter__(self):
         wi = get_worker_info()
@@ -397,7 +518,8 @@ def collate(items, pad_id):
     block = torch.stack([pad(i[5], 0) for i in items])
     kind = torch.stack([pad(i[6], -1) for i in items])
     pos = torch.stack([pad(i[7], 0) for i in items])
-    return ids, am, of.block_attention(kind, block), pos, sem, codes, tm, block
+    mblock = torch.stack([pad(i[8], 0) for i in items])
+    return ids, am, of.block_attention(kind, block), pos, sem, codes, tm, mblock
 
 
 def main():
@@ -416,6 +538,10 @@ def main():
                     help="probabilities of 0 / 1 / 2 context sentences before the span")
     ap.add_argument("--context-after", type=float, nargs=3, default=(0.5, 0.25, 0.25),
                     help="probabilities of 0 / 1 / 2 context sentences after the span")
+    ap.add_argument("--context-curriculum", default="0:0,50000:1,100000:0,150000:2,200000:0,250000:3,300000:0,350000:4",
+                    help="step:sentence-count stages for previous and next text/audio context")
+    ap.add_argument("--sentence-curriculum", default="0:1,100000:2,200000:3,300000:4",
+                    help="step:max-target-sentences stages within one speaker")
     ap.add_argument("--speaker-mode", type=float, nargs=3, default=(0.45, 0.3, 0.25),
                     help="weights of speaker token + prompt / token only / prompt only (speakers with a token)")
     ap.add_argument("--dialogue", type=float, default=0.5,
@@ -424,7 +550,17 @@ def main():
                     help="the backbone sees all 10 codes of earlier blocks (3 target copies); off: semantic ids only")
     ap.add_argument("--cross-prompt", type=float, default=0.5,
                     help="share of the spans whose prompt is another 2-8 s line of the speaker (not the span's start)")
+    ap.add_argument("--no-mtp-prompt", dest="mtp_prompt", action="store_false",
+                    help="do not show the prompt frames to the MTP (as before)")
+    ap.add_argument("--prompt-min-seconds", type=float, default=6.0,
+                    help="minimum same-speaker history audio for a cross prompt; several earlier lines are joined")
     ap.add_argument("--tag-oversample", type=int, default=3, help="spans with inline tags this many times")
+    ap.add_argument("--tag-windows", type=int, default=1,
+                    help="windows per tagged sentence (other length / neighbours / prompt; use with --tag-oversample 1)")
+    ap.add_argument("--dialogue-mixed", type=float, default=0.0,
+                    help="share of the prompted scenes where some voices go by their ID instead of a definition")
+    ap.add_argument("--dialogue-windows", type=int, default=1,
+                    help="different scene windows (length, offset, prompts) around each used speaker change")
     ap.add_argument("--tag-drop", type=float, default=0.25, help="share of the samples with their tags stripped")
     ap.add_argument("--dialogue-prompt", type=float, default=0.5,
                     help="share of the scenes with one prompt per voice (S1, S2, ...) instead of speaker tokens")
@@ -456,13 +592,17 @@ def main():
     torch.backends.cuda.matmul.allow_tf32 = torch.backends.cudnn.allow_tf32 = True
 
     model, tokenizer = of.OmniFish.from_omnivoice()
+    tokenizer = of.IdTokenizer(tokenizer, model.text_vocab)  # speaker / recording IDs as single tokens
     if not args.no_grad_ckpt:
         model.llm.gradient_checkpointing_enable()
     model = model.cuda()
-    is_new = lambda n: n.startswith(("audio_embeddings", "semantic_head", "mtp."))
+    is_id = lambda n: n.startswith(("spk_", "q_"))  # the ID tables and their projections
+    is_new = lambda n: n.startswith(("audio_embeddings", "semantic_head", "mtp.", "lang_"))
     new = [p for n, p in model.named_parameters() if is_new(n)]
-    old = [p for n, p in model.named_parameters() if not is_new(n)]
-    opt = torch.optim.AdamW([{"params": old, "lr": args.lr}, {"params": new, "lr": args.lr_new}],
+    old = [p for n, p in model.named_parameters() if not is_new(n) and not is_id(n)]
+    ids = [p for n, p in model.named_parameters() if is_id(n)]
+    opt = torch.optim.AdamW([{"params": old, "lr": args.lr}, {"params": new, "lr": args.lr_new},
+                             {"params": ids, "lr": args.lr_new, "weight_decay": 0.0}],  # no decay: rare IDs keep their vector
                             betas=(0.9, 0.95), weight_decay=0.01, fused=True)
     base = [g["lr"] for g in opt.param_groups]
     step = 0
@@ -470,8 +610,15 @@ def main():
     src = latest if os.path.exists(latest) else args.resume_from
     if src:  # resume: model, optimizer, step (weights / moments of an older vocab upgraded)
         ck = torch.load(src, map_location="cpu", weights_only=False)
-        model.load_state_dict(of.OmniFish.upgrade_state(ck["model"]))
-        names = [n for n, _ in model.named_parameters() if not is_new(n)] + [n for n, _ in model.named_parameters() if is_new(n)]
+        if model.load_weights(ck["model"], tokenizer.tok):  # checkpoint from before the ID table: a third group
+            g = dict(ck["opt"]["param_groups"][1])
+            g["weight_decay"] = 0.0
+            n0 = sum(len(x["params"]) for x in ck["opt"]["param_groups"])
+            g["params"] = list(range(n0, n0 + len(ids)))
+            ck["opt"]["param_groups"].append(g)
+            print("ID tables started from the text pieces of each ID (SVD)", flush=True)
+        names = ([n for n, _ in model.named_parameters() if not is_new(n) and not is_id(n)] +
+                 [n for n, _ in model.named_parameters() if is_new(n)] + [n for n, _ in model.named_parameters() if is_id(n)])
         for i, st in ck["opt"]["state"].items():
             for key in ("exp_avg", "exp_avg_sq"):
                 st[key] = of.OmniFish.upgrade_moment(names[i], st[key])
@@ -480,7 +627,7 @@ def main():
         print(f"resumed from {src} at step {step}", flush=True)
         del ck
     elif args.init:
-        model.load_state_dict(of.OmniFish.upgrade_state(torch.load(args.init, map_location="cpu", weights_only=False)["model"]))
+        model.load_weights(torch.load(args.init, map_location="cpu", weights_only=False)["model"], tokenizer.tok)
         print(f"initialised from {args.init}", flush=True)
 
     def set_lr(step):
@@ -497,10 +644,18 @@ def main():
     log = open(f"{args.out}/train.log", "a")
     max_frames, max_gap, max_skip = int(args.max_seconds * FPS), int(args.max_pause * FPS), int(args.max_skip * FPS)
     schedule = sorted((int(a), int(b)) for a, b in (x.split(":") for x in args.block_schedule.split(",") if x))
+    context_schedule = sorted((int(a), int(b)) for a, b in (x.split(":") for x in args.context_curriculum.split(",") if x))
+    sentence_schedule = sorted((int(a), int(b)) for a, b in (x.split(":") for x in args.sentence_curriculum.split(",") if x))
     fixed_block = args.block_size
 
     def block_size_at(step):
         return next((b for s0, b in reversed(schedule) if s0 <= step), fixed_block)
+
+    def context_sentences_at(step):
+        return next((n for s0, n in reversed(context_schedule) if s0 <= step), 0)
+
+    def max_sentences_at(step):
+        return next((n for s0, n in reversed(sentence_schedule) if s0 <= step), 1)
 
     model.train()
     while step < args.steps:
@@ -508,22 +663,31 @@ def main():
         tr_idx, va_idx = load_index(args.tokens, args.val_books)
         # dialogue scenes only once the multispeaker lines are checked (speaker_mismatch.parquet)
         dlg = args.dialogue if os.path.exists("/data/dataset/build/speaker_mismatch.parquet") else 0.0
+        args.max_sentences = max_sentences_at(step)
+        prompt_min_frames = int(args.prompt_min_seconds * FPS)
         tr = build_spans(tr_idx, args.max_sentences, max_frames, max_gap, max_skip, seed=step, dialogue=dlg,
-                         dialogue_prompt=args.dialogue_prompt, cross_prompt=args.cross_prompt)
+                         dialogue_prompt=args.dialogue_prompt, cross_prompt=args.cross_prompt,
+                 dialogue_windows=args.dialogue_windows, tag_windows=args.tag_windows,
+                 prompt_min_frames=prompt_min_frames,
+                         dialogue_mixed=args.dialogue_mixed)
         va = build_spans(va_idx, args.max_sentences, max_frames, max_gap, max_skip, 1, dialogue=dlg,
-                         dialogue_prompt=args.dialogue_prompt, cross_prompt=args.cross_prompt)
+                 dialogue_prompt=args.dialogue_prompt, cross_prompt=args.cross_prompt,
+                 prompt_min_frames=prompt_min_frames)
         all_hours = sum(span_frames(x) for x in tr) / FPS / 3600
         tr = balance_speakers(tr, args.speaker_cap, seed=step)
         if args.max_train_spans:
             tr = random.Random(0).sample(tr, min(args.max_train_spans, len(tr)))
         tagged = [x for x in tr if TAG_RE.search(x[2])]
         tr = tr + tagged * (args.tag_oversample - 1)  # spans with inline tags come up more often
+        scenes = [x for x in tr if x[6] in ("dialogue", "dialogue_p")]
         hours = sum(span_frames(x) for x in tr) / FPS / 3600
         args.block_size = block_size_at(step)
+        args.context_sentences = context_sentences_at(step)
         msg = (f"step {step}: train spans {len(tr)} ({hours:.0f} h of {all_hours:.0f} h after the speaker cap, "
-               f"{len(tagged)} with tags x{args.tag_oversample}) "
+               f"{len(tagged)} with tags x{args.tag_oversample}, {len(scenes)} scenes) "
                f"from {tr_idx.tokens.nunique()} books, {tr_idx.global_speaker.nunique()} speakers | "
-               f"val spans {len(va)} | block {args.block_size} frames")
+                               f"val spans {len(va)} | target max {args.max_sentences} sentences | "
+                               f"context {args.context_sentences} sentences | block {args.block_size} frames")
         print(msg, flush=True)
         log.write(msg + "\n")
         dl = DataLoader(SpanDataset(tr, args.tokens, tokenizer, args), batch_size=None, num_workers=args.workers,
@@ -539,7 +703,7 @@ def main():
             gn = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             opt.step()
             opt.zero_grad(set_to_none=True)
-            seen += int(batch[6].sum())  # target speech frames
+            seen += int((batch[6] & (batch[7] >= 0)).sum())  # target speech frames (not the MTP's prompt frames)
             if step % 50 == 0:
                 pc = " ".join(f"{x:.2f}" for x in out["residual"].tolist())
                 msg = (f"step {step} loss {out['loss'].item():.3f} | sem {out['semantic'].item():.3f} | res {pc} | "
