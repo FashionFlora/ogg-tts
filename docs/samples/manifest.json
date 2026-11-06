@@ -1,0 +1,179 @@
+[
+ {
+  "file": "en_neutral.mp3",
+  "group": "languages",
+  "lang": "en",
+  "text": "The lighthouse keeper had not spoken to anyone in weeks, and the sea had become his only companion.",
+  "label": "neutral",
+  "cfg": 1.5,
+  "seconds": 6.4
+ },
+ {
+  "file": "en_tagged.mp3",
+  "group": "languages",
+  "lang": "en",
+  "text": "[laughing] You actually believed that? Oh, come on, I was only joking!",
+  "label": "tags",
+  "cfg": 1.5,
+  "seconds": 3.9
+ },
+ {
+  "file": "pl_neutral.mp3",
+  "group": "languages",
+  "lang": "pl",
+  "text": "Latarnik od tygodni z nikim nie rozmawiał, a morze stało się jego jedynym towarzyszem.",
+  "label": "neutral",
+  "cfg": 1.5,
+  "seconds": 5.3
+ },
+ {
+  "file": "pl_tagged.mp3",
+  "group": "languages",
+  "lang": "pl",
+  "text": "[whispering] Cicho… [scared] Ktoś stoi za drzwiami.",
+  "label": "tags",
+  "cfg": 1.5,
+  "seconds": 2.9
+ },
+ {
+  "file": "es_neutral.mp3",
+  "group": "languages",
+  "lang": "es",
+  "text": "El farero llevaba semanas sin hablar con nadie, y el mar se había convertido en su único compañero.",
+  "label": "neutral",
+  "cfg": 1.5,
+  "seconds": 5.6
+ },
+ {
+  "file": "es_tagged.mp3",
+  "group": "languages",
+  "lang": "es",
+  "text": "[angry] ¡Te lo he dicho mil veces! ¡Deja de tocar mis cosas!",
+  "label": "tags",
+  "cfg": 1.5,
+  "seconds": 3.5
+ },
+ {
+  "file": "de_neutral.mp3",
+  "group": "languages",
+  "lang": "de",
+  "text": "Der Leuchtturmwärter hatte seit Wochen mit niemandem gesprochen, und das Meer war sein einziger Gefährte geworden.",
+  "label": "neutral",
+  "cfg": 1.5,
+  "seconds": 5.6
+ },
+ {
+  "file": "de_tagged.mp3",
+  "group": "languages",
+  "lang": "de",
+  "text": "[sighing] Na gut. [tired] Dann mache ich es eben selbst.",
+  "label": "tags",
+  "cfg": 1.5,
+  "seconds": 3.9
+ },
+ {
+  "file": "ru_neutral.mp3",
+  "group": "languages",
+  "lang": "ru",
+  "text": "Смотритель маяка уже несколько недель ни с кем не разговаривал, и море стало его единственным спутником.",
+  "label": "neutral",
+  "cfg": 1.5,
+  "seconds": 6.3
+ },
+ {
+  "file": "fr_neutral.mp3",
+  "group": "languages",
+  "lang": "fr",
+  "text": "Le gardien du phare n'avait parlé à personne depuis des semaines, et la mer était devenue sa seule compagne.",
+  "label": "neutral",
+  "cfg": 1.5,
+  "seconds": 5.3
+ },
+ {
+  "file": "fr_tagged.mp3",
+  "group": "languages",
+  "lang": "fr",
+  "text": "[sad] Je pensais qu'il reviendrait… mais il n'est jamais revenu.",
+  "label": "tags",
+  "cfg": 1.5,
+  "seconds": 3.3
+ },
+ {
+  "file": "pt_neutral.mp3",
+  "group": "languages",
+  "lang": "pt",
+  "text": "O faroleiro não falava com ninguém havia semanas, e o mar tornara-se o seu único companheiro.",
+  "label": "neutral",
+  "cfg": 1.5,
+  "seconds": 5.0
+ },
+ {
+  "file": "pt_tagged.mp3",
+  "group": "languages",
+  "lang": "pt",
+  "text": "[shouting] Corram! Eles estão logo atrás de nós!",
+  "label": "tags",
+  "cfg": 1.5,
+  "seconds": 2.7
+ },
+ {
+  "file": "it_neutral.mp3",
+  "group": "languages",
+  "lang": "it",
+  "text": "Il guardiano del faro non parlava con nessuno da settimane, e il mare era diventato il suo unico compagno.",
+  "label": "neutral",
+  "cfg": 1.5,
+  "seconds": 6.1
+ },
+ {
+  "file": "it_tagged.mp3",
+  "group": "languages",
+  "lang": "it",
+  "text": "[playful] Indovina chi ha mangiato l'ultima fetta di torta?",
+  "label": "tags",
+  "cfg": 1.5,
+  "seconds": 2.7
+ },
+ {
+  "file": "ru_tagged.mp3",
+  "group": "languages",
+  "lang": "ru",
+  "text": "[excited] Получилось! Ты слышишь? У нас получилось!",
+  "label": "tags",
+  "cfg": 1.5,
+  "seconds": 3.3
+ },
+ {
+  "file": "ctx_angry.mp3",
+  "group": "context",
+  "lang": "en",
+  "text": "Fine. Do whatever you want.",
+  "label": "after an argument",
+  "cfg": 1.5,
+  "seconds": 2.1,
+  "semantic_left": [
+   "You never listen to me! I'm sick of this!"
+  ]
+ },
+ {
+  "file": "ctx_sad.mp3",
+  "group": "context",
+  "lang": "en",
+  "text": "Fine. Do whatever you want.",
+  "label": "after bad news",
+  "cfg": 1.5,
+  "seconds": 2.6,
+  "semantic_left": [
+   "She told me she's leaving tomorrow, and she isn't coming back."
+  ]
+ },
+ {
+  "file": "story_en.mp3",
+  "group": "long",
+  "lang": "en",
+  "text": "Once upon a time, beyond seven mountains and seven seas, there was a magical land called Eldoria. It was full of mysterious forests, mighty castles and extraordinary creatures. At the very heart of the land lay the Crystal of Life, which protected Eldoria from evil. One day the crystal vanished, and darkness fell over the kingdom. The king summoned his bravest warriors to find the treasure and save his people.",
+  "label": "one pass, 5 sentences",
+  "cfg": 1.0,
+  "seconds": 28.6
+ }
+]

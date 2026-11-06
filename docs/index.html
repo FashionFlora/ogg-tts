@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OGG TTS</title>
+<meta name="description" content="OGG TTS: expressive multilingual text-to-speech with block diffusion over Fish Audio codec tokens. Architecture, samples and evaluation.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #fbfaf7; --surface: #ffffff; --surface-2: #f3f1ec; --ink: #1d1d1b; --ink-2: #4a4a46; --ink-3: #7a7a74;
+  --line: #e3e0d8; --accent: #2f6b4f; --accent-soft: #e3efe8; --accent-2: #8a5a1f; --accent-2-soft: #f5ead9;
+  --mask: #c9c5bb; --code-bg: #f3f1ec; --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
+  --c1: #2f6b4f; --c2: #4f8a6c; --c3: #7aa98f; --c4: #8a5a1f; --c5: #b98544;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141513; --surface: #1c1d1a; --surface-2: #242522; --ink: #ecebe6; --ink-2: #c2c0b8; --ink-3: #8f8d86;
+    --line: #34352f; --accent: #7cc4a0; --accent-soft: #1f3329; --accent-2: #e0ad6a; --accent-2-soft: #3a2c19;
+    --mask: #4a4a44; --code-bg: #232420; --shadow: none;
+    --c1: #7cc4a0; --c2: #5fa583; --c3: #487f65; --c4: #e0ad6a; --c5: #b98544;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141513; --surface: #1c1d1a; --surface-2: #242522; --ink: #ecebe6; --ink-2: #c2c0b8; --ink-3: #8f8d86;
+  --line: #34352f; --accent: #7cc4a0; --accent-soft: #1f3329; --accent-2: #e0ad6a; --accent-2-soft: #3a2c19;
+  --mask: #4a4a44; --code-bg: #232420; --shadow: none;
+  --c1: #7cc4a0; --c2: #5fa583; --c3: #487f65; --c4: #e0ad6a; --c5: #b98544;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+header.hero { padding: 64px 0 40px; border-bottom: 1px solid var(--line); }
+.kicker { font: 500 13px/1 "JetBrains Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-size: clamp(36px, 7vw, 56px); line-height: 1.05; margin: 14px 0 12px; letter-spacing: -.02em; }
+.lead { font-size: clamp(17px, 2.4vw, 20px); color: var(--ink-2); max-width: 720px; margin: 0 0 24px; }
+.links { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); font-weight: 500; font-size: 15px; box-shadow: var(--shadow); }
+.btn:hover { text-decoration: none; border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.status { margin-top: 18px; font-size: 14px; color: var(--ink-3); }
+section { padding: 48px 0 8px; }
+h2 { font-size: 28px; letter-spacing: -.01em; margin: 0 0 8px; }
+h3 { font-size: 18px; margin: 28px 0 8px; }
+.sub { color: var(--ink-2); margin: 0 0 20px; max-width: 760px; }
+.grid4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; box-shadow: var(--shadow); }
+.card b { display: block; margin-bottom: 4px; }
+.card p { margin: 0; color: var(--ink-2); font-size: 15px; }
+figure { margin: 18px 0 28px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: var(--shadow); }
+figure svg { width: 100%; height: auto; display: block; }
+.figscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+@media (max-width: 760px) { .figscroll svg { min-width: 720px; } .figscroll::after { content: "← scroll →"; display: block; text-align: center; color: var(--ink-3); font-size: 12px; margin-top: 4px; } }
+figcaption { color: var(--ink-3); font-size: 14px; margin-top: 10px; }
+.svgtext { fill: var(--ink); font: 500 13px Inter, sans-serif; }
+.svgsmall { fill: var(--ink-2); font: 400 11.5px Inter, sans-serif; }
+.svgmono { fill: var(--ink-2); font: 400 11px "JetBrains Mono", monospace; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { font-weight: 600; color: var(--ink-2); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 4px 8px; box-shadow: var(--shadow); }
+.samples { display: grid; gap: 10px; }
+.sample { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: grid; gap: 8px; }
+.sample .meta { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.pill { font: 500 12px "JetBrains Mono", monospace; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.pill.alt { background: var(--accent-2-soft); color: var(--accent-2); }
+.sample .text { color: var(--ink); }
+.sample .tag { color: var(--accent-2); font-family: "JetBrains Mono", monospace; font-size: 14px; }
+audio { width: 100%; height: 36px; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; }
+pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; overflow-x: auto; font: 13.5px/1.55 "JetBrains Mono", monospace; color: var(--ink); }
+.note { color: var(--ink-3); font-size: 14px; }
+footer { margin-top: 56px; padding: 28px 0 48px; border-top: 1px solid var(--line); color: var(--ink-3); font-size: 14px; }
+.theme { position: fixed; top: 12px; right: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: 999px; padding: 6px 10px; font: 500 13px Inter, sans-serif; cursor: pointer; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.tabs button { border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); padding: 6px 12px; border-radius: 999px; font: 500 14px Inter, sans-serif; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+@media (max-width: 560px) { header.hero { padding-top: 48px; } section { padding-top: 36px; } th, td { padding: 8px 6px; } }
+</style>
+</head>
+<body>
+<button class="theme" id="theme" aria-label="Toggle dark mode">◐ Theme</button>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker">Text-to-speech · 8 languages · 0.75B</div>
+    <h1>OGG TTS</h1>
+    <p class="lead">Expressive multilingual text-to-speech with <b>block diffusion</b> over Fish Audio codec tokens. Zero-shot voice cloning, optional emotion tags, context-aware delivery and streaming.</p>
+    <div class="links">
+      <a class="btn primary" href="https://huggingface.co/spaces/FashionFlora/ogg-tts">▶ Try it (Space)</a>
+      <a class="btn" href="https://huggingface.co/FashionFlora/ogg-tts">🤗 Model</a>
+      <a class="btn" href="https://github.com/FashionFlora/ogg-tts">GitHub</a>
+    </div>
+    <div class="status">Preview: checkpoint 120k of a 400k-step pre-training run, still in progress. Built with Fish Audio.</div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section id="highlights">
+  <div class="grid4">
+    <div class="card"><b>Expressive by default</b><p>Reads with emotion that fits the text and its context, no tags needed.</p></div>
+    <div class="card"><b>24 inline tags</b><p><code>[angry]</code> <code>[whispering]</code> <code>[laughing]</code> <code>[sighing]</code> … placed where they should take effect.</p></div>
+    <div class="card"><b>Zero-shot cloning</b><p>From a few seconds of reference audio and its transcript, or with the model's own voice.</p></div>
+    <div class="card"><b>Streaming</b><p>Blocks of 0.74 s are final once decoded and can be played immediately.</p></div>
+  </div>
+</section>
+
+<section id="architecture">
+  <h2>Architecture</h2>
+  <p class="sub">A text-and-audio transformer (OmniVoice, initialised from Qwen3-0.6B) generates the semantic codebook of the Fish Audio codec block by block. An axial multi-token-prediction decoder fills in the 9 acoustic codebooks, and the codec renders 44.1 kHz audio.</p>
+
+  <figure>
+    <div class="figscroll">
+    <svg viewBox="0 0 940 300" role="img" aria-label="Pipeline: text and prompt go into the block-diffusion backbone, which emits semantic codes; the axial MTP adds 9 residual codebooks; the Fish codec decodes audio">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--ink-3)"/></marker>
+      </defs>
+      <!-- inputs -->
+      <rect x="10" y="40" width="170" height="78" rx="12" fill="var(--surface-2)" stroke="var(--line)"/>
+      <text x="24" y="66" class="svgtext">Text</text>
+      <text x="24" y="86" class="svgsmall">target text, inline tags,</text>
+      <text x="24" y="102" class="svgsmall">neighbouring lines as context</text>
+      <rect x="10" y="150" width="170" height="78" rx="12" fill="var(--surface-2)" stroke="var(--line)"/>
+      <text x="24" y="176" class="svgtext">Voice prompt</text>
+      <text x="24" y="196" class="svgsmall">a few seconds of audio</text>
+      <text x="24" y="212" class="svgsmall">→ Fish codec, 10 codes / frame</text>
+      <!-- backbone -->
+      <rect x="230" y="30" width="250" height="210" rx="14" fill="var(--accent-soft)" stroke="var(--accent)"/>
+      <text x="248" y="58" class="svgtext">Backbone · block diffusion</text>
+      <text x="248" y="80" class="svgsmall">OmniVoice / Qwen3-0.6B, 28 layers</text>
+      <text x="248" y="98" class="svgsmall">bidirectional inside a block,</text>
+      <text x="248" y="114" class="svgsmall">block-causal across blocks</text>
+      <g transform="translate(248,132)">
+        <text x="0" y="0" class="svgmono">block of 16 frames (0.74 s)</text>
+        <g transform="translate(0,10)">
+          <rect x="0" y="0" width="12" height="18" rx="3" fill="var(--c1)"/><rect x="14" y="0" width="12" height="18" rx="3" fill="var(--c1)"/><rect x="28" y="0" width="12" height="18" rx="3" fill="var(--mask)"/><rect x="42" y="0" width="12" height="18" rx="3" fill="var(--c1)"/>
+          <rect x="56" y="0" width="12" height="18" rx="3" fill="var(--mask)"/><rect x="70" y="0" width="12" height="18" rx="3" fill="var(--mask)"/><rect x="84" y="0" width="12" height="18" rx="3" fill="var(--c1)"/><rect x="98" y="0" width="12" height="18" rx="3" fill="var(--mask)"/>
+          <rect x="112" y="0" width="12" height="18" rx="3" fill="var(--c1)"/><rect x="126" y="0" width="12" height="18" rx="3" fill="var(--mask)"/><rect x="140" y="0" width="12" height="18" rx="3" fill="var(--c1)"/><rect x="154" y="0" width="12" height="18" rx="3" fill="var(--mask)"/>
+          <rect x="168" y="0" width="12" height="18" rx="3" fill="var(--mask)"/><rect x="182" y="0" width="12" height="18" rx="3" fill="var(--c1)"/><rect x="196" y="0" width="12" height="18" rx="3" fill="var(--mask)"/><rect x="210" y="0" width="12" height="18" rx="3" fill="var(--c1)"/>
+        </g>
+        <text x="0" y="48" class="svgsmall">6 unmasking iterations, most confident</text>
+        <text x="0" y="64" class="svgsmall">first, classifier-free guidance</text>
+        <text x="0" y="82" class="svgsmall">length: the model emits END itself</text>
+      </g>
+      <!-- MTP -->
+      <rect x="530" y="30" width="200" height="210" rx="14" fill="var(--accent-2-soft)" stroke="var(--accent-2)"/>
+      <text x="548" y="58" class="svgtext">Axial MTP · 110M</text>
+      <text x="548" y="80" class="svgsmall">codebooks 1–9 of the block,</text>
+      <text x="548" y="96" class="svgsmall">one per step, all frames at once</text>
+      <g transform="translate(548,110)">
+        <rect x="0" y="0" width="164" height="12" rx="3" fill="var(--c1)"/>
+        <rect x="0" y="14" width="164" height="10" rx="3" fill="var(--c4)" opacity=".95"/>
+        <rect x="0" y="26" width="164" height="10" rx="3" fill="var(--c4)" opacity=".85"/>
+        <rect x="0" y="38" width="164" height="10" rx="3" fill="var(--c4)" opacity=".75"/>
+        <rect x="0" y="50" width="164" height="10" rx="3" fill="var(--c4)" opacity=".65"/>
+        <rect x="0" y="62" width="164" height="10" rx="3" fill="var(--c5)" opacity=".6"/>
+        <rect x="0" y="74" width="164" height="10" rx="3" fill="var(--mask)"/>
+        <rect x="0" y="86" width="164" height="10" rx="3" fill="var(--mask)"/>
+        <rect x="0" y="98" width="164" height="10" rx="3" fill="var(--mask)"/>
+        <rect x="0" y="110" width="164" height="10" rx="3" fill="var(--mask)"/>
+      </g>
+      <!-- codec -->
+      <rect x="780" y="80" width="150" height="110" rx="14" fill="var(--surface-2)" stroke="var(--line)"/>
+      <text x="796" y="108" class="svgtext">Fish codec</text>
+      <text x="796" y="128" class="svgsmall">10 codes → waveform</text>
+      <text x="796" y="144" class="svgsmall">44.1 kHz, 21.5 fps</text>
+      <path d="M800 168 q8 -14 16 0 t16 0 t16 0 t16 0 t16 0 t16 0 t16 0" fill="none" stroke="var(--accent)" stroke-width="2"/>
+      <!-- arrows -->
+      <line x1="182" y1="79" x2="226" y2="100" stroke="var(--ink-3)" stroke-width="1.6" marker-end="url(#ar)"/>
+      <line x1="182" y1="189" x2="226" y2="168" stroke="var(--ink-3)" stroke-width="1.6" marker-end="url(#ar)"/>
+      <line x1="482" y1="135" x2="526" y2="135" stroke="var(--ink-3)" stroke-width="1.6" marker-end="url(#ar)"/>
+      <text x="486" y="126" class="svgmono">states</text>
+      <line x1="732" y1="135" x2="776" y2="135" stroke="var(--ink-3)" stroke-width="1.6" marker-end="url(#ar)"/>
+      <path d="M630 242 C630 286, 355 286, 355 244" fill="none" stroke="var(--ink-3)" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#ar)"/>
+      <text x="400" y="292" class="svgsmall">finished block (all 10 codes) joins the KV cache as context of the next block</text>
+    </svg>
+    </div>
+    <figcaption>Figure 1. One block of 0.74 s: the backbone unmasks the semantic codes, the axial MTP fills the 9 acoustic codebooks, the codec decodes audio. The block is then fixed and streamed.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="figscroll">
+    <svg viewBox="0 0 940 250" role="img" aria-label="Input sequence and block attention mask">
+      <g transform="translate(10,20)">
+        <text x="0" y="0" class="svgtext">Input sequence</text>
+        <g transform="translate(0,14)">
+          <rect x="0" y="0" width="92" height="36" rx="8" fill="var(--surface-2)" stroke="var(--line)"/><text x="10" y="22" class="svgmono">lang · style</text>
+          <rect x="96" y="0" width="120" height="36" rx="8" fill="var(--surface-2)" stroke="var(--line)"/><text x="106" y="22" class="svgmono">context lines</text>
+          <rect x="220" y="0" width="170" height="36" rx="8" fill="var(--surface-2)" stroke="var(--line)"/><text x="230" y="22" class="svgmono">prompt text + text</text>
+          <rect x="394" y="0" width="140" height="36" rx="8" fill="var(--accent-2-soft)" stroke="var(--accent-2)"/><text x="404" y="22" class="svgmono">prompt frames</text>
+          <rect x="538" y="0" width="104" height="36" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="548" y="22" class="svgmono">block 1 ✓</text>
+          <rect x="646" y="0" width="104" height="36" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="656" y="22" class="svgmono">block 2 ✓</text>
+          <rect x="754" y="0" width="160" height="36" rx="8" fill="none" stroke="var(--accent)" stroke-dasharray="5 4"/><text x="764" y="22" class="svgmono">block 3 · masked</text>
+        </g>
+        <text x="0" y="78" class="svgsmall">Text tokens and audio frames share one sequence. Prompt frames and finished blocks carry all 10 codebooks; the block being generated starts fully masked.</text>
+      </g>
+      <g transform="translate(40,120)">
+        <text x="0" y="0" class="svgtext">Attention</text>
+        <g transform="translate(0,12)">
+          <!-- 5x5 mask: ctx, b1, b2, b3 -->
+          <g class="m">
+            <rect x="0" y="0" width="22" height="22" fill="var(--c1)"/><rect x="24" y="0" width="22" height="22" fill="var(--mask)" opacity=".35"/><rect x="48" y="0" width="22" height="22" fill="var(--mask)" opacity=".35"/><rect x="72" y="0" width="22" height="22" fill="var(--mask)" opacity=".35"/>
+            <rect x="0" y="24" width="22" height="22" fill="var(--c1)"/><rect x="24" y="24" width="22" height="22" fill="var(--c1)"/><rect x="48" y="24" width="22" height="22" fill="var(--mask)" opacity=".35"/><rect x="72" y="24" width="22" height="22" fill="var(--mask)" opacity=".35"/>
+            <rect x="0" y="48" width="22" height="22" fill="var(--c1)"/><rect x="24" y="48" width="22" height="22" fill="var(--c1)"/><rect x="48" y="48" width="22" height="22" fill="var(--c1)"/><rect x="72" y="48" width="22" height="22" fill="var(--mask)" opacity=".35"/>
+            <rect x="0" y="72" width="22" height="22" fill="var(--c1)"/><rect x="24" y="72" width="22" height="22" fill="var(--c1)"/><rect x="48" y="72" width="22" height="22" fill="var(--c1)"/><rect x="72" y="72" width="22" height="22" fill="var(--c4)"/>
+          </g>
+          <text x="104" y="15" class="svgmono">context</text><text x="104" y="39" class="svgmono">block 1</text><text x="104" y="63" class="svgmono">block 2</text><text x="104" y="87" class="svgmono">block 3</text>
+        </g>
+      </g>
+      <g transform="translate(250,140)">
+        <text x="0" y="12" class="svgsmall">● Context (text + prompt) sees only context.</text>
+        <text x="0" y="34" class="svgsmall">● A finished block sees the context and every finished block up to itself (with all 10 codes).</text>
+        <text x="0" y="56" class="svgsmall">● The block being generated sees everything before it and itself, bidirectionally (orange):</text>
+        <text x="14" y="74" class="svgsmall">its 16 frames are unmasked together, so prosody inside a block is planned as a whole.</text>
+        <text x="0" y="96" class="svgsmall">● Finished blocks never change: KV cache, streaming, no look-back edits.</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Figure 2. Block diffusion: autoregressive across blocks, diffusion (iterative unmasking) inside a block.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="figscroll">
+    <svg viewBox="0 0 940 270" role="img" aria-label="Axial MTP: a grid of frames by codebooks with attention along codebooks inside a frame and along frames inside a codebook">
+      <g transform="translate(30,30)">
+        <text x="0" y="0" class="svgtext">Axial MTP: a (frame × codebook) grid</text>
+        <g transform="translate(60,22)">
+          <!-- grid 12 frames x 10 levels -->
+          <g id="axgrid"></g>
+          <text x="-56" y="12" class="svgmono">code 0</text>
+          <text x="-56" y="120" class="svgmono">code 9</text>
+          <text x="0" y="206" class="svgmono">frames of the prompt, earlier blocks and the current block →</text>
+          <line x1="132" y1="74" x2="300" y2="74" stroke="var(--accent)" stroke-width="2.4" marker-end="url(#ar)"/>
+        </g>
+      </g>
+      <g transform="translate(560,58)">
+        <text x="0" y="0" class="svgsmall"><tspan font-weight="600">Codebook attention</tspan> (vertical, causal): token (t, j)</text>
+        <text x="0" y="18" class="svgsmall">sees codes 0…j of its own frame and predicts code j+1.</text>
+        <text x="0" y="48" class="svgsmall"><tspan font-weight="600">Frame attention</tspan> (horizontal): the same codebook</text>
+        <text x="0" y="66" class="svgsmall">across the prompt, earlier blocks and the current block.</text>
+        <text x="0" y="96" class="svgsmall">6 layers, each with both attentions and a SwiGLU.</text>
+        <text x="0" y="114" class="svgsmall">Decoding: 9 steps per block, all 16 frames in parallel.</text>
+        <text x="0" y="132" class="svgsmall">The input of every frame is the backbone state.</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Figure 3. The acoustic decoder. Vertical: the residual codebooks of one frame, coarse to fine. Horizontal: the same codebook over time, so the timbre and channel of the prompt carry over.</figcaption>
+  </figure>
+
+  <div class="tablewrap">
+    <table>
+      <tr><th>Component</th><th>Details</th></tr>
+      <tr><td>Backbone</td><td>OmniVoice / Qwen3-0.6B, 28 layers, d = 1024, block attention (Figure 2)</td></tr>
+      <tr><td>Acoustic decoder</td><td>Axial MTP, 6 layers, d = 768, 110M parameters</td></tr>
+      <tr><td>Parameters</td><td>~0.75B (codec excluded)</td></tr>
+      <tr><td>Codec</td><td>Fish Audio Drama 3 / S2: 44.1 kHz, 21.5 frames/s, 1 semantic codebook (4096) + 9 residual (1024)</td></tr>
+      <tr><td>Block</td><td>16 frames = 0.74 s</td></tr>
+      <tr><td>Decoding</td><td>6 unmasking iterations with classifier-free guidance, then 9 MTP steps, per block; KV cache</td></tr>
+      <tr><td>Training</td><td>about 8,200 h of studio-quality speech in 8 languages (a private collection), 1× RTX PRO 6000, 400k steps planned</td></tr>
+    </table>
+  </div>
+</section>
+
+<section id="samples">
+  <h2>Samples</h2>
+  <p class="sub">Checkpoint 120k, <code>cfg=1.5</code>, no voice prompt: the voices are the model's own. One generation per item, checked with ASR; one take that stopped after its first sentence (Russian) was generated again.</p>
+  <h3>8 languages</h3>
+  <div class="tabs" id="langtabs" role="tablist"></div>
+  <div class="two" id="langsamples"></div>
+
+  <h3>Context sets the delivery</h3>
+  <p class="sub">The same line, voice and seed. Only the preceding line, given as text context and not spoken, differs.</p>
+  <div class="two" id="ctxsamples"></div>
+
+  <h3>Long text in one pass</h3>
+  <div class="samples" id="longsamples"></div>
+</section>
+
+<section id="evaluation">
+  <h2>Evaluation</h2>
+  <p class="sub">Checkpoint 120k, <code>cfg=1.5</code>, one sample per item. WER with Whisper large-v3-turbo, speaker similarity with ECAPA2 (cosine), pitch variation as F0 standard deviation in semitones.</p>
+  <h3>Held-out recordings</h3>
+  <p class="sub">136 validation items in English, Spanish and German. Recordings and texts were never trained on. Each item clones a voice from a 6–10 s prompt and speaks two sentences that also exist as a real recording (passed through the same codec as the reference).</p>
+  <div class="tablewrap">
+    <table>
+      <tr><th></th><th class="num">OGG TTS 120k</th><th class="num">Real recording</th></tr>
+      <tr><td>WER</td><td class="num"><b>1.4 %</b></td><td class="num">2.6 %</td></tr>
+      <tr><td>Speaker similarity to the prompt</td><td class="num"><b>0.773</b></td><td class="num">0.737</td></tr>
+      <tr><td>Duration vs. the real recording (median)</td><td class="num">0.99</td><td class="num">1.00</td></tr>
+      <tr><td>Pitch variation (F0 std, semitones)</td><td class="num">3.58</td><td class="num">4.25</td></tr>
+    </table>
+  </div>
+  <h3>All 8 languages</h3>
+  <p class="sub">New texts, a neutral and an angry line per voice (32 items).</p>
+  <div class="tablewrap">
+    <table>
+      <tr><th></th><th class="num">EN</th><th class="num">PL</th><th class="num">ES</th><th class="num">DE</th><th class="num">RU</th><th class="num">FR</th><th class="num">PT</th><th class="num">IT</th></tr>
+      <tr><td>WER</td><td class="num">0.0 %</td><td class="num">0.8 %</td><td class="num">0.0 %</td><td class="num">0.0 %</td><td class="num">0.0 %</td><td class="num">0.0 %</td><td class="num">3.3 %</td><td class="num">6.7 %</td></tr>
+      <tr><td>Similarity</td><td class="num">0.780</td><td class="num">0.767</td><td class="num">0.828</td><td class="num">0.824</td><td class="num">0.763</td><td class="num">0.708</td><td class="num">0.771</td><td class="num">0.841</td></tr>
+    </table>
+  </div>
+  <p class="note">The pace matches real speech. Intonation is still about 15 % flatter than in the real recordings; this is the main open point for the rest of the run. Public benchmarks (Seed-TTS, CV3) follow with the final checkpoint.</p>
+</section>
+
+<section id="usage">
+  <h2>Usage</h2>
+<pre>git clone https://github.com/FashionFlora/ogg-tts &amp;&amp; cd ogg-tts
+git clone https://github.com/fishaudio/fish-speech ogg_tts/fish-speech
+export OMNIVOICE_PATH=$(huggingface-cli download k2-fsa/OmniVoice)
+export FISH_CODEC_PATH=$(huggingface-cli download fishaudio/drama-3 codec.pth)</pre>
+<pre>import sys; sys.path.insert(0, "ogg_tts")
+from huggingface_hub import hf_hub_download
+import infer_omnifish as inf, fish_codec as fc
+
+model, tok = inf.load_model(hf_hub_download("FashionFlora/ogg-tts", "model.safetensors"), "cuda")
+codec = fc.load_codec("cuda")
+codes = inf.generate_cached(model, tok, None, "", "[sighing] Hello! I am OGG.", "en", cfg=1.5)
+audio = fc.decode(codec, codes[None].cuda())[0].float().cpu().numpy()   # 44.1 kHz</pre>
+  <p class="note">Voice cloning: pass the reference codes (<code>fc.encode</code>) and its exact transcript. Context: <code>semantic_left=(…)</code> and <code>after=(…)</code>. Details in the <a href="https://huggingface.co/FashionFlora/ogg-tts">model card</a>.</p>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <p><b>Built with Fish Audio.</b> The model generates Fish Audio codec tokens; audio output is subject to the Fish Audio Community License. Code: Apache 2.0. Weights: research use.</p>
+    <p>Do not use OGG TTS to imitate the voice of a real person without their consent, to impersonate, deceive, defraud or harass anyone, or to create sexual content involving minors.</p>
+    <p>The name comes from the trolls of <i>The Witcher</i>. OGG is the first of three architectures (OGG, ROGG, POGG) compared in an upcoming technical report.</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var root = document.documentElement, btn = document.getElementById("theme");
+  try { var t = localStorage.getItem("ogg-theme"); if (t) root.setAttribute("data-theme", t); } catch (e) {}
+  btn.addEventListener("click", function () {
+    var dark = root.getAttribute("data-theme") ? root.getAttribute("data-theme") === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    var next = dark ? "light" : "dark"; root.setAttribute("data-theme", next);
+    try { localStorage.setItem("ogg-theme", next); } catch (e) {}
+  });
+
+  // axial grid of Figure 3: 12 frames x 10 codebooks
+  var g = document.getElementById("axgrid"), ns = "http://www.w3.org/2000/svg";
+  for (var t = 0; t < 12; t++) for (var j = 0; j < 10; j++) {
+    var r = document.createElementNS(ns, "rect");
+    r.setAttribute("x", t * 32); r.setAttribute("y", j * 12); r.setAttribute("width", 28); r.setAttribute("height", 10); r.setAttribute("rx", 2);
+    var cur = t >= 10, decided = !cur || j <= 4;
+    r.setAttribute("fill", j === 0 ? "var(--c1)" : decided ? "var(--c4)" : "var(--mask)");
+    r.setAttribute("opacity", j === 0 ? 1 : decided ? (1 - j * 0.06) : 0.6);
+    g.appendChild(r);
+  }
+  var col = document.createElementNS(ns, "rect");
+  col.setAttribute("x", 10 * 32 - 3); col.setAttribute("y", -3); col.setAttribute("width", 2 * 32 + 2); col.setAttribute("height", 10 * 12 + 4);
+  col.setAttribute("rx", 4); col.setAttribute("fill", "none"); col.setAttribute("stroke", "var(--accent-2)"); col.setAttribute("stroke-dasharray", "4 3");
+  g.appendChild(col);
+  var vt = document.createElementNS(ns, "text"); vt.setAttribute("x", 10 * 32); vt.setAttribute("y", 138); vt.setAttribute("class", "svgmono"); vt.textContent = "current block";
+  g.appendChild(vt);
+  var va = document.createElementNS(ns, "line");
+  va.setAttribute("x1", 10 * 32 + 14); va.setAttribute("y1", 2); va.setAttribute("x2", 10 * 32 + 14); va.setAttribute("y2", 64);
+  va.setAttribute("stroke", "var(--accent-2)"); va.setAttribute("stroke-width", 2.4); va.setAttribute("marker-end", "url(#ar)");
+  g.appendChild(va);
+
+  var names = { en: "English", pl: "Polski", es: "Español", de: "Deutsch", ru: "Русский", fr: "Français", pt: "Português", it: "Italiano" };
+  function esc(s) { return s.replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
+  function fmt(text) { return esc(text).replace(/\[[^\]]+\]/g, function (m) { return '<span class="tag">' + m + "</span>"; }); }
+  function card(s, extra) {
+    var d = document.createElement("div"); d.className = "sample";
+    d.innerHTML = '<div class="meta"><span class="pill">' + esc(s.label) + "</span>" + (extra || "") + '<span class="note">' + s.seconds + " s</span></div>" +
+      (s.semantic_left ? '<div class="note">Context: “' + esc(s.semantic_left[0]) + "”</div>" : "") +
+      '<div class="text">' + fmt(s.text) + '</div><audio controls preload="none" src="samples/' + s.file + '"></audio>';
+    return d;
+  }
+  fetch("samples/manifest.json").then(function (r) { return r.json(); }).then(function (m) {
+    var langs = []; m.forEach(function (s) { if (s.group === "languages" && langs.indexOf(s.lang) < 0) langs.push(s.lang); });
+    var tabs = document.getElementById("langtabs"), box = document.getElementById("langsamples");
+    function show(l) {
+      box.innerHTML = ""; m.filter(function (s) { return s.group === "languages" && s.lang === l; }).forEach(function (s) { box.appendChild(card(s)); });
+      Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute("aria-selected", b.dataset.lang === l ? "true" : "false"); });
+    }
+    langs.forEach(function (l) { var b = document.createElement("button"); b.textContent = names[l] || l; b.dataset.lang = l; b.setAttribute("role", "tab"); b.onclick = function () { show(l); }; tabs.appendChild(b); });
+    if (langs.length) show(langs[0]);
+    m.filter(function (s) { return s.group === "context"; }).forEach(function (s) { document.getElementById("ctxsamples").appendChild(card(s)); });
+    m.filter(function (s) { return s.group === "long"; }).forEach(function (s) { document.getElementById("longsamples").appendChild(card(s, '<span class="pill alt">cfg ' + s.cfg + "</span>")); });
+  });
+})();
+</script>
+</body>
+</html>
