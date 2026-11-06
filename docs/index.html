@@ -270,16 +270,16 @@ footer { margin-top: 56px; padding: 28px 0 48px; border-top: 1px solid var(--lin
 
 <section id="samples">
   <h2>Samples</h2>
-  <p class="sub">Checkpoint 120k, <code>cfg=1.5</code>, no voice prompt: the voices are the model's own. One generation per item, checked with ASR; one take that stopped after its first sentence (Russian) was generated again.</p>
-  <h3>8 languages</h3>
-  <div class="tabs" id="langtabs" role="tablist"></div>
+  <p class="sub">Checkpoint 120k, <code>cfg=1.5</code>, no voice prompt: the voices are the model's own. Every language has its own texts. Each item was generated 3 times and one take was selected with Whisper (language identification and transcript).</p>
+  <div class="tabs" id="langtabs" role="tablist" aria-label="Language"></div>
+  <h3 id="lines-h">Lines</h3>
   <div class="two" id="langsamples"></div>
 
   <h3>Context sets the delivery</h3>
   <p class="sub">The same line, voice and seed. Only the preceding line, given as text context and not spoken, differs.</p>
   <div class="two" id="ctxsamples"></div>
 
-  <h3>Long text in one pass</h3>
+  <h3>Longer text in one pass</h3>
   <div class="samples" id="longsamples"></div>
 </section>
 
@@ -378,16 +378,22 @@ audio = fc.decode(codec, codes[None].cuda())[0].float().cpu().numpy()   # 44.1 k
     return d;
   }
   fetch("samples/manifest.json").then(function (r) { return r.json(); }).then(function (m) {
-    var langs = []; m.forEach(function (s) { if (s.group === "languages" && langs.indexOf(s.lang) < 0) langs.push(s.lang); });
-    var tabs = document.getElementById("langtabs"), box = document.getElementById("langsamples");
+    var langs = []; m.forEach(function (s) { if (langs.indexOf(s.lang) < 0) langs.push(s.lang); });
+    var tabs = document.getElementById("langtabs");
+    function fill(id, group, extra) {
+      var box = document.getElementById(id); box.innerHTML = "";
+      return function (l) { m.filter(function (s) { return s.group === group && s.lang === l; }).forEach(function (s) { box.appendChild(card(s, extra && extra(s))); }); };
+    }
     function show(l) {
-      box.innerHTML = ""; m.filter(function (s) { return s.group === "languages" && s.lang === l; }).forEach(function (s) { box.appendChild(card(s)); });
+      fill("langsamples", "languages")(l);
+      fill("ctxsamples", "context")(l);
+      fill("longsamples", "long", function (s) { return '<span class="pill alt">cfg ' + s.cfg + "</span>"; })(l);
       Array.prototype.forEach.call(tabs.children, function (b) { b.setAttribute("aria-selected", b.dataset.lang === l ? "true" : "false"); });
+      try { localStorage.setItem("ogg-lang", l); } catch (e) {}
     }
     langs.forEach(function (l) { var b = document.createElement("button"); b.textContent = names[l] || l; b.dataset.lang = l; b.setAttribute("role", "tab"); b.onclick = function () { show(l); }; tabs.appendChild(b); });
-    if (langs.length) show(langs[0]);
-    m.filter(function (s) { return s.group === "context"; }).forEach(function (s) { document.getElementById("ctxsamples").appendChild(card(s)); });
-    m.filter(function (s) { return s.group === "long"; }).forEach(function (s) { document.getElementById("longsamples").appendChild(card(s, '<span class="pill alt">cfg ' + s.cfg + "</span>")); });
+    var start = langs[0]; try { var saved = localStorage.getItem("ogg-lang"); if (saved && langs.indexOf(saved) >= 0) start = saved; } catch (e) {}
+    if (start) show(start);
   });
 })();
 </script>
