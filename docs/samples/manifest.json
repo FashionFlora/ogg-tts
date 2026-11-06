@@ -9,9 +9,10 @@
   "cfg": 1.5,
   "seconds": 5.2,
   "seed": 3000,
-  "det": "en",
-  "asr": " The rain had stopped hours ago, but the streets still shone like black glass under the lamps.",
-  "wer": 0.0
+  "alts": [
+   "en_l0_s3001.mp3",
+   "en_l0_s3002.mp3"
+  ]
  },
  {
   "file": "en_l1_s3010.mp3",
@@ -23,9 +24,10 @@
   "cfg": 1.5,
   "seconds": 6.1,
   "seed": 3010,
-  "det": "en",
-  "asr": " Nobody in the village knew where the old man had come from, and nobody dared to ask.",
-  "wer": 0.0
+  "alts": [
+   "en_l1_s3011.mp3",
+   "en_l1_s3012.mp3"
+  ]
  },
  {
   "file": "en_l2_s3022.mp3",
@@ -37,9 +39,10 @@
   "cfg": 1.5,
   "seconds": 4.4,
   "seed": 3022,
-  "det": "en",
-  "asr": " Oh, you should have seen his face. He looked like he'd swallowed a lemon.",
-  "wer": 0.0
+  "alts": [
+   "en_l2_s3020.mp3",
+   "en_l2_s3021.mp3"
+  ]
  },
  {
   "file": "en_l3_s3030.mp3",
@@ -51,9 +54,10 @@
   "cfg": 1.5,
   "seconds": 3.4,
   "seed": 3030,
-  "det": "en",
-  "asr": " Keep your voice down! The guards change shifts in two minutes.",
-  "wer": 0.0
+  "alts": [
+   "en_l3_s3031.mp3",
+   "en_l3_s3032.mp3"
+  ]
  },
  {
   "file": "en_l4_s3040.mp3",
@@ -65,9 +69,10 @@
   "cfg": 1.5,
   "seconds": 3.4,
   "seed": 3040,
-  "det": "en",
-  "asr": " I trusted you with everything and you sold it for a handful of coins?",
-  "wer": 0.0
+  "alts": [
+   "en_l4_s3041.mp3",
+   "en_l4_s3042.mp3"
+  ]
  },
  {
   "file": "en_l5_s3050.mp3",
@@ -79,9 +84,10 @@
   "cfg": 1.5,
   "seconds": 4.9,
   "seed": 3050,
-  "det": "en",
-  "asr": " We used to sit on this bench every Sunday. Now it's just me and the pigeons.",
-  "wer": 0.0
+  "alts": [
+   "en_l5_s3051.mp3",
+   "en_l5_s3052.mp3"
+  ]
  },
  {
   "file": "en_l6_s3060.mp3",
@@ -93,9 +99,10 @@
   "cfg": 1.5,
   "seconds": 5.2,
   "seed": 3060,
-  "det": "en",
-  "asr": " It works. It actually works. Quick, call everyone. They have to see this.",
-  "wer": 0.0
+  "alts": [
+   "en_l6_s3061.mp3",
+   "en_l6_s3062.mp3"
+  ]
  },
  {
   "file": "en_l7_s3070.mp3",
@@ -107,9 +114,130 @@
   "cfg": 1.5,
   "seconds": 3.4,
   "seed": 3070,
-  "det": "en",
-  "asr": " Hold the line. Nobody runs. Do you hear me? Nobody.",
-  "wer": 0.0
+  "alts": [
+   "en_l7_s3071.mp3",
+   "en_l7_s3072.mp3"
+  ]
+ },
+ {
+  "file": "en_l8_s9001.mp3",
+  "item": "l8",
+  "group": "languages",
+  "lang": "en",
+  "text": "[sighing] Another Monday. Another meeting that could have been an email.",
+  "label": "sighing",
+  "cfg": 1.5,
+  "seconds": 4.0,
+  "seed": 9001,
+  "alts": [
+   "en_l8_s9000.mp3",
+   "en_l8_s9002.mp3"
+  ]
+ },
+ {
+  "file": "en_l9_s9010.mp3",
+  "item": "l9",
+  "group": "languages",
+  "lang": "en",
+  "text": "[tired] I've been driving all night. Just give me five minutes, please.",
+  "label": "tired",
+  "cfg": 1.5,
+  "seconds": 3.4,
+  "seed": 9010,
+  "alts": [
+   "en_l9_s9011.mp3",
+   "en_l9_s9012.mp3"
+  ]
+ },
+ {
+  "file": "en_l10_s9020.mp3",
+  "item": "l10",
+  "group": "languages",
+  "lang": "en",
+  "text": "[playful] Guess who found the last piece of chocolate cake? Not you.",
+  "label": "playful",
+  "cfg": 1.5,
+  "seconds": 3.4,
+  "seed": 9020,
+  "alts": [
+   "en_l10_s9021.mp3",
+   "en_l10_s9022.mp3"
+  ]
+ },
+ {
+  "file": "en_l11_s9030.mp3",
+  "item": "l11",
+  "group": "languages",
+  "lang": "en",
+  "text": "[scared] Did you hear that? Something just moved in the attic.",
+  "label": "scared",
+  "cfg": 1.5,
+  "seconds": 3.0,
+  "seed": 9030,
+  "alts": [
+   "en_l11_s9031.mp3",
+   "en_l11_s9032.mp3"
+  ]
+ },
+ {
+  "file": "en_l12_s9040.mp3",
+  "item": "l12",
+  "group": "languages",
+  "lang": "en",
+  "text": "[voice breaking] He said he'd be home for dinner. He promised.",
+  "label": "voice breaking",
+  "cfg": 1.5,
+  "seconds": 3.0,
+  "seed": 9040,
+  "alts": [
+   "en_l12_s9041.mp3",
+   "en_l12_s9042.mp3"
+  ]
+ },
+ {
+  "file": "en_l13_s9050.mp3",
+  "item": "l13",
+  "group": "languages",
+  "lang": "en",
+  "text": "I opened the door, and there he was. [pause] Exactly as I remembered him.",
+  "label": "pause",
+  "cfg": 1.5,
+  "seconds": 3.7,
+  "seed": 9050,
+  "alts": [
+   "en_l13_s9051.mp3",
+   "en_l13_s9052.mp3"
+  ]
+ },
+ {
+  "file": "en_l14_s9060.mp3",
+  "item": "l14",
+  "group": "languages",
+  "lang": "en",
+  "text": "[slowly] Put the knife down. Nobody else has to get hurt tonight.",
+  "label": "slowly",
+  "cfg": 1.5,
+  "seconds": 3.4,
+  "seed": 9060,
+  "alts": [
+   "en_l14_s9061.mp3",
+   "en_l14_s9062.mp3"
+  ]
+ },
+ {
+  "file": "en_l15_s9070.mp3",
+  "item": "l15",
+  "group": "languages",
+  "lang": "en",
+  "text": "[softly] Sleep now, little one. The storm will be gone by morning.",
+  "label": "softly",
+  "cfg": 1.5,
+  "seconds": 4.1,
+  "seed": 9070,
+  "alts": [
+   "en_l15_s9071.mp3",
+   "en_l15_s9072.mp3"
+  ]
  },
  {
   "file": "en_ctx_angry_s5000.mp3",
@@ -124,9 +252,10 @@
   "semantic_left": [
    "You never listen to me! I'm sick of this!"
   ],
-  "det": "en",
-  "asr": " Fine. Do whatever you want.",
-  "wer": 0.0
+  "alts": [
+   "en_ctx_angry_s5001.mp3",
+   "en_ctx_angry_s5002.mp3"
+  ]
  },
  {
   "file": "en_ctx_sad_s5000.mp3",
@@ -141,9 +270,10 @@
   "semantic_left": [
    "She told me she's leaving tomorrow, and she isn't coming back."
   ],
-  "det": "en",
-  "asr": " Fine. Do whatever you want.",
-  "wer": 0.0
+  "alts": [
+   "en_ctx_sad_s5001.mp3",
+   "en_ctx_sad_s5002.mp3"
+  ]
  },
  {
   "file": "en_story_s7001.mp3",
@@ -155,9 +285,7 @@
   "cfg": 1.5,
   "seconds": 21.6,
   "seed": 7001,
-  "det": "en",
-  "asr": " Captain Mara Holt had sailed through storms that sank entire fleets, yet she had never seen a sea this quiet. The water lay flat as a mirror, and the stars were reflected so perfectly that the ship seemed to float in the sky. Her crew whispered that it was an omen. Mara only tightened her grip on the wheel and ordered them to keep sailing north.",
-  "wer": 0.0
+  "alts": []
  },
  {
   "file": "pl_l0_s3100.mp3",
@@ -169,9 +297,10 @@
   "cfg": 1.5,
   "seconds": 5.5,
   "seed": 3100,
-  "det": "pl",
-  "asr": " Pociąg spóźnił się o dwie godziny, więc na peronie zostało tylko kilku zmarzniętych podróżnych.",
-  "wer": 0.0
+  "alts": [
+   "pl_l0_s3101.mp3",
+   "pl_l0_s3102.mp3"
+  ]
  },
  {
   "file": "pl_l1_s3110.mp3",
@@ -183,9 +312,10 @@
   "cfg": 1.5,
   "seconds": 3.8,
   "seed": 3110,
-  "det": "pl",
-  "asr": " Babcia zawsze mówiła, że w starym sadzie mieszka ktoś, kogo lepiej nie budzić.",
-  "wer": 0.0
+  "alts": [
+   "pl_l1_s3111.mp3",
+   "pl_l1_s3112.mp3"
+  ]
  },
  {
   "file": "pl_l2_s3120.mp3",
@@ -197,9 +327,10 @@
   "cfg": 1.5,
   "seconds": 4.5,
   "seed": 3120,
-  "det": "pl",
-  "asr": " Ty serio myślałeś, że to był prawdziwy niedźwiedź? To był pan Zdzisiek w kożuchu.",
-  "wer": 0.0
+  "alts": [
+   "pl_l2_s3121.mp3",
+   "pl_l2_s3122.mp3"
+  ]
  },
  {
   "file": "pl_l3_s3130.mp3",
@@ -211,9 +342,10 @@
   "cfg": 1.5,
   "seconds": 4.2,
   "seed": 3130,
-  "det": "pl",
-  "asr": " Nie zapalaj światła. Ona jeszcze nie śpi. Słyszę ją za ścianą.",
-  "wer": 0.0
+  "alts": [
+   "pl_l3_s3131.mp3",
+   "pl_l3_s3132.mp3"
+  ]
  },
  {
   "file": "pl_l4_s3140.mp3",
@@ -225,9 +357,10 @@
   "cfg": 1.5,
   "seconds": 4.6,
   "seed": 3140,
-  "det": "pl",
-  "asr": " Trzy razy cię prosiłem! Trzy razy! I znowu wszystko na mojej głowie!",
-  "wer": 0.0
+  "alts": [
+   "pl_l4_s3141.mp3",
+   "pl_l4_s3142.mp3"
+  ]
  },
  {
   "file": "pl_l5_s3150.mp3",
@@ -239,9 +372,10 @@
   "cfg": 1.5,
   "seconds": 5.1,
   "seed": 3150,
-  "det": "pl",
-  "asr": " Pisałem do niego co roku na święta. Nigdy nie odpisał, a ja i tak czekałem.",
-  "wer": 0.0
+  "alts": [
+   "pl_l5_s3151.mp3",
+   "pl_l5_s3152.mp3"
+  ]
  },
  {
   "file": "pl_l6_s3160.mp3",
@@ -253,9 +387,10 @@
   "cfg": 1.5,
   "seconds": 4.1,
   "seed": 3160,
-  "det": "pl",
-  "asr": " Mamy to! Przyjęli nas! Słyszysz? Jedziemy do Krakowa!",
-  "wer": 0.0
+  "alts": [
+   "pl_l6_s3161.mp3",
+   "pl_l6_s3162.mp3"
+  ]
  },
  {
   "file": "pl_l7_s3170.mp3",
@@ -267,9 +402,130 @@
   "cfg": 1.5,
   "seconds": 3.3,
   "seed": 3170,
-  "det": "pl",
-  "asr": " Wszyscy na zewnątrz! Dach zaraz się zawali, szybciej!",
-  "wer": 0.0
+  "alts": [
+   "pl_l7_s3171.mp3",
+   "pl_l7_s3172.mp3"
+  ]
+ },
+ {
+  "file": "pl_l8_s9100.mp3",
+  "item": "l8",
+  "group": "languages",
+  "lang": "pl",
+  "text": "[sighing] No i znowu poniedziałek. Kolejne zebranie, które mogło być mailem.",
+  "label": "sighing",
+  "cfg": 1.5,
+  "seconds": 4.7,
+  "seed": 9100,
+  "alts": [
+   "pl_l8_s9101.mp3",
+   "pl_l8_s9102.mp3"
+  ]
+ },
+ {
+  "file": "pl_l9_s9110.mp3",
+  "item": "l9",
+  "group": "languages",
+  "lang": "pl",
+  "text": "[tired] Jechałem całą noc. Daj mi chociaż pięć minut, proszę.",
+  "label": "tired",
+  "cfg": 1.5,
+  "seconds": 3.6,
+  "seed": 9110,
+  "alts": [
+   "pl_l9_s9111.mp3",
+   "pl_l9_s9112.mp3"
+  ]
+ },
+ {
+  "file": "pl_l10_s9120.mp3",
+  "item": "l10",
+  "group": "languages",
+  "lang": "pl",
+  "text": "[playful] Zgadnij, kto zjadł ostatni kawałek sernika? Na pewno nie ty.",
+  "label": "playful",
+  "cfg": 1.5,
+  "seconds": 4.6,
+  "seed": 9120,
+  "alts": [
+   "pl_l10_s9121.mp3",
+   "pl_l10_s9122.mp3"
+  ]
+ },
+ {
+  "file": "pl_l11_s9130.mp3",
+  "item": "l11",
+  "group": "languages",
+  "lang": "pl",
+  "text": "[scared] Słyszałeś? Coś się przed chwilą poruszyło na strychu.",
+  "label": "scared",
+  "cfg": 1.5,
+  "seconds": 3.5,
+  "seed": 9130,
+  "alts": [
+   "pl_l11_s9131.mp3",
+   "pl_l11_s9132.mp3"
+  ]
+ },
+ {
+  "file": "pl_l12_s9140.mp3",
+  "item": "l12",
+  "group": "languages",
+  "lang": "pl",
+  "text": "[voice breaking] Obiecał, że wróci na kolację. Obiecał mi.",
+  "label": "voice breaking",
+  "cfg": 1.5,
+  "seconds": 2.8,
+  "seed": 9140,
+  "alts": [
+   "pl_l12_s9141.mp3",
+   "pl_l12_s9142.mp3"
+  ]
+ },
+ {
+  "file": "pl_l13_s9150.mp3",
+  "item": "l13",
+  "group": "languages",
+  "lang": "pl",
+  "text": "Otworzyłam drzwi i stał tam. [pause] Dokładnie taki, jakim go zapamiętałam.",
+  "label": "pause",
+  "cfg": 1.5,
+  "seconds": 5.1,
+  "seed": 9150,
+  "alts": [
+   "pl_l13_s9151.mp3",
+   "pl_l13_s9152.mp3"
+  ]
+ },
+ {
+  "file": "pl_l14_s9160.mp3",
+  "item": "l14",
+  "group": "languages",
+  "lang": "pl",
+  "text": "[slowly] Odłóż nóż. Nikt więcej nie musi dziś ucierpieć.",
+  "label": "slowly",
+  "cfg": 1.5,
+  "seconds": 3.4,
+  "seed": 9160,
+  "alts": [
+   "pl_l14_s9161.mp3",
+   "pl_l14_s9162.mp3"
+  ]
+ },
+ {
+  "file": "pl_l15_s9170.mp3",
+  "item": "l15",
+  "group": "languages",
+  "lang": "pl",
+  "text": "[softly] Śpij już, maleńka. Do rana burza minie.",
+  "label": "softly",
+  "cfg": 1.5,
+  "seconds": 3.3,
+  "seed": 9170,
+  "alts": [
+   "pl_l15_s9171.mp3",
+   "pl_l15_s9172.mp3"
+  ]
  },
  {
   "file": "pl_ctx_angry_s5010.mp3",
@@ -284,9 +540,10 @@
   "semantic_left": [
    "Ty mnie nigdy nie słuchasz! Mam tego dość!"
   ],
-  "det": "pl",
-  "asr": " Dobra, rób co chcesz.",
-  "wer": 0.0
+  "alts": [
+   "pl_ctx_angry_s5011.mp3",
+   "pl_ctx_angry_s5012.mp3"
+  ]
  },
  {
   "file": "pl_ctx_sad_s5010.mp3",
@@ -301,9 +558,10 @@
   "semantic_left": [
    "Powiedziała mi, że jutro wyjeżdża i już nie wróci."
   ],
-  "det": "pl",
-  "asr": " Dobra, rób co chcesz.",
-  "wer": 0.0
+  "alts": [
+   "pl_ctx_sad_s5011.mp3",
+   "pl_ctx_sad_s5012.mp3"
+  ]
  },
  {
   "file": "pl_story_s7010.mp3",
@@ -315,9 +573,7 @@
   "cfg": 1.5,
   "seconds": 24.3,
   "seed": 7010,
-  "det": "pl",
-  "asr": " Za siedmioma górami w małym miasteczku nad rzeką mieszkał zegarmistrz, który potrafił naprawić każdy zegar. Ludzie przynosili mu stare budziki, zegary z kukułką, a nawet kieszonkowe zegarki po dziadkach. Pewnej nocy ktoś zapukał do jego drzwi i podał mu zegar, który chodził do tyłu. Zegarmistrz spojrzał na tarczę i zrozumiał, że ten zegar odmierza czas, który dopiero nadejdzie.",
-  "wer": 0.0
+  "alts": []
  },
  {
   "file": "es_l0_s3200.mp3",
@@ -329,9 +585,10 @@
   "cfg": 1.5,
   "seconds": 6.0,
   "seed": 3200,
-  "det": "es",
-  "asr": " El mercado abría al amanecer, cuando el olor a pan recién hecho llenaba todas las calles del barrio.",
-  "wer": 0.0
+  "alts": [
+   "es_l0_s3201.mp3",
+   "es_l0_s3202.mp3"
+  ]
  },
  {
   "file": "es_l1_s3210.mp3",
@@ -343,9 +600,10 @@
   "cfg": 1.5,
   "seconds": 7.0,
   "seed": 3210,
-  "det": "es",
-  "asr": " Durante años, la casa del acantilado permaneció cerrada, hasta que una noche alguien encendió una vela en la ventana.",
-  "wer": 0.0
+  "alts": [
+   "es_l1_s3211.mp3",
+   "es_l1_s3212.mp3"
+  ]
  },
  {
   "file": "es_l2_s3220.mp3",
@@ -357,9 +615,10 @@
   "cfg": 1.5,
   "seconds": 4.2,
   "seed": 3220,
-  "det": "es",
-  "asr": " ¿Que te perdiste otra vez con el GPS? Pero si vives a dos calles.",
-  "wer": 0.0
+  "alts": [
+   "es_l2_s3221.mp3",
+   "es_l2_s3222.mp3"
+  ]
  },
  {
   "file": "es_l3_s3230.mp3",
@@ -371,9 +630,10 @@
   "cfg": 1.5,
   "seconds": 4.2,
   "seed": 3230,
-  "det": "es",
-  "asr": " No hagas ruido. Si el perro se despierta, estamos perdidos.",
-  "wer": 0.0
+  "alts": [
+   "es_l3_s3231.mp3",
+   "es_l3_s3232.mp3"
+  ]
  },
  {
   "file": "es_l4_s3240.mp3",
@@ -385,9 +645,10 @@
   "cfg": 1.5,
   "seconds": 4.0,
   "seed": 3240,
-  "det": "es",
-  "asr": " Me prometiste que esta vez sería diferente y mírate otra vez lo mismo.",
-  "wer": 0.0
+  "alts": [
+   "es_l4_s3241.mp3",
+   "es_l4_s3242.mp3"
+  ]
  },
  {
   "file": "es_l5_s3250.mp3",
@@ -399,9 +660,10 @@
   "cfg": 1.5,
   "seconds": 4.0,
   "seed": 3250,
-  "det": "es",
-  "asr": " Mi abuelo plantó ese naranjo el día que nací. Ayer lo cortaron.",
-  "wer": 0.0
+  "alts": [
+   "es_l5_s3251.mp3",
+   "es_l5_s3252.mp3"
+  ]
  },
  {
   "file": "es_l6_s3260.mp3",
@@ -413,9 +675,10 @@
   "cfg": 1.5,
   "seconds": 4.0,
   "seed": 3260,
-  "det": "es",
-  "asr": " ¡Ganamos! ¡No me lo puedo creer! ¡Ganamos la final!",
-  "wer": 0.0
+  "alts": [
+   "es_l6_s3261.mp3",
+   "es_l6_s3262.mp3"
+  ]
  },
  {
   "file": "es_l7_s3270.mp3",
@@ -427,9 +690,130 @@
   "cfg": 1.5,
   "seconds": 3.3,
   "seed": 3270,
-  "det": "es",
-  "asr": " ¡Todos al barco! ¡La marea está subiendo! ¡Rápido!",
-  "wer": 0.0
+  "alts": [
+   "es_l7_s3271.mp3",
+   "es_l7_s3272.mp3"
+  ]
+ },
+ {
+  "file": "es_l8_s9200.mp3",
+  "item": "l8",
+  "group": "languages",
+  "lang": "es",
+  "text": "[sighing] Otra vez lunes. Otra reunión que podría haber sido un correo.",
+  "label": "sighing",
+  "cfg": 1.5,
+  "seconds": 4.5,
+  "seed": 9200,
+  "alts": [
+   "es_l8_s9201.mp3",
+   "es_l8_s9202.mp3"
+  ]
+ },
+ {
+  "file": "es_l9_s9210.mp3",
+  "item": "l9",
+  "group": "languages",
+  "lang": "es",
+  "text": "[tired] He conducido toda la noche. Dame cinco minutos, por favor.",
+  "label": "tired",
+  "cfg": 1.5,
+  "seconds": 3.7,
+  "seed": 9210,
+  "alts": [
+   "es_l9_s9211.mp3",
+   "es_l9_s9212.mp3"
+  ]
+ },
+ {
+  "file": "es_l10_s9220.mp3",
+  "item": "l10",
+  "group": "languages",
+  "lang": "es",
+  "text": "[playful] ¿Adivina quién se comió el último trozo de tarta? Tú no, desde luego.",
+  "label": "playful",
+  "cfg": 1.5,
+  "seconds": 4.4,
+  "seed": 9220,
+  "alts": [
+   "es_l10_s9221.mp3",
+   "es_l10_s9222.mp3"
+  ]
+ },
+ {
+  "file": "es_l11_s9230.mp3",
+  "item": "l11",
+  "group": "languages",
+  "lang": "es",
+  "text": "[scared] ¿Lo has oído? Algo se ha movido en el desván.",
+  "label": "scared",
+  "cfg": 1.5,
+  "seconds": 2.6,
+  "seed": 9230,
+  "alts": [
+   "es_l11_s9231.mp3",
+   "es_l11_s9232.mp3"
+  ]
+ },
+ {
+  "file": "es_l12_s9240.mp3",
+  "item": "l12",
+  "group": "languages",
+  "lang": "es",
+  "text": "[voice breaking] Dijo que volvería para cenar. Me lo prometió.",
+  "label": "voice breaking",
+  "cfg": 1.5,
+  "seconds": 3.1,
+  "seed": 9240,
+  "alts": [
+   "es_l12_s9241.mp3",
+   "es_l12_s9242.mp3"
+  ]
+ },
+ {
+  "file": "es_l13_s9250.mp3",
+  "item": "l13",
+  "group": "languages",
+  "lang": "es",
+  "text": "Abrí la puerta y allí estaba. [pause] Exactamente como lo recordaba.",
+  "label": "pause",
+  "cfg": 1.5,
+  "seconds": 3.8,
+  "seed": 9250,
+  "alts": [
+   "es_l13_s9251.mp3",
+   "es_l13_s9252.mp3"
+  ]
+ },
+ {
+  "file": "es_l14_s9260.mp3",
+  "item": "l14",
+  "group": "languages",
+  "lang": "es",
+  "text": "[slowly] Suelta el cuchillo. Nadie más tiene que salir herido esta noche.",
+  "label": "slowly",
+  "cfg": 1.5,
+  "seconds": 3.4,
+  "seed": 9260,
+  "alts": [
+   "es_l14_s9261.mp3",
+   "es_l14_s9262.mp3"
+  ]
+ },
+ {
+  "file": "es_l15_s9270.mp3",
+  "item": "l15",
+  "group": "languages",
+  "lang": "es",
+  "text": "[softly] Duérmete ya, pequeña. Por la mañana la tormenta habrá pasado.",
+  "label": "softly",
+  "cfg": 1.5,
+  "seconds": 3.4,
+  "seed": 9270,
+  "alts": [
+   "es_l15_s9271.mp3",
+   "es_l15_s9272.mp3"
+  ]
  },
  {
   "file": "es_ctx_angry_s5020.mp3",
@@ -444,9 +828,10 @@
   "semantic_left": [
    "¡Nunca me escuchas! ¡Estoy harto de esto!"
   ],
-  "det": "es",
-  "asr": " Vale, haz lo que quieras.",
-  "wer": 0.0
+  "alts": [
+   "es_ctx_angry_s5021.mp3",
+   "es_ctx_angry_s5022.mp3"
+  ]
  },
  {
   "file": "es_ctx_sad_s5020.mp3",
@@ -461,9 +846,10 @@
   "semantic_left": [
    "Me dijo que se va mañana y que no va a volver."
   ],
-  "det": "es",
-  "asr": " Vale, haz lo que quieras.",
-  "wer": 0.0
+  "alts": [
+   "es_ctx_sad_s5021.mp3",
+   "es_ctx_sad_s5022.mp3"
+  ]
  },
  {
   "file": "es_story_s7020.mp3",
@@ -475,9 +861,7 @@
   "cfg": 1.5,
   "seconds": 23.4,
   "seed": 7020,
-  "det": "es",
-  "asr": " En un pueblo de la costa vivía una niña llamada Lucía que coleccionaba conchas de colores. Cada mañana bajaba a la playa antes que nadie y guardaba sus tesoros en una caja de madera. Un día encontró una concha que al acercarla al oído no sonaba como el mar, sino como una voz que la llamaba por su nombre. Desde entonces, Lucía nunca volvió a mirar el océano de la misma manera.",
-  "wer": 0.0
+  "alts": []
  },
  {
   "file": "de_l0_s3300.mp3",
@@ -489,9 +873,10 @@
   "cfg": 1.5,
   "seconds": 5.6,
   "seed": 3300,
-  "det": "de",
-  "asr": " Der Nebel lag so dicht über dem Moor, dass man kaum die eigene Hand vor Augen sehen konnte.",
-  "wer": 0.0
+  "alts": [
+   "de_l0_s3301.mp3",
+   "de_l0_s3302.mp3"
+  ]
  },
  {
   "file": "de_l1_s3310.mp3",
@@ -503,9 +888,10 @@
   "cfg": 1.5,
   "seconds": 4.8,
   "seed": 3310,
-  "det": "de",
-  "asr": " Seit 30 Jahren schloss der alte Buchhändler seinen Laden pünktlich um 6 Uhr ab.",
-  "wer": 0.14285714285714285
+  "alts": [
+   "de_l1_s3311.mp3",
+   "de_l1_s3312.mp3"
+  ]
  },
  {
   "file": "de_l2_s3320.mp3",
@@ -517,9 +903,10 @@
   "cfg": 1.5,
   "seconds": 4.1,
   "seed": 3320,
-  "det": "de",
-  "asr": " Du hast den Kuchen mit Salz statt Zucker gebacken? Das erklärt einiges.",
-  "wer": 0.0
+  "alts": [
+   "de_l2_s3321.mp3",
+   "de_l2_s3322.mp3"
+  ]
  },
  {
   "file": "de_l3_s3330.mp3",
@@ -531,9 +918,10 @@
   "cfg": 1.5,
   "seconds": 3.5,
   "seed": 3330,
-  "det": "de",
-  "asr": " Bleib hinter mir. Und egal was passiert, schau nicht nach unten.",
-  "wer": 0.0
+  "alts": [
+   "de_l3_s3331.mp3",
+   "de_l3_s3332.mp3"
+  ]
  },
  {
   "file": "de_l4_s3340.mp3",
@@ -545,9 +933,10 @@
   "cfg": 1.5,
   "seconds": 4.8,
   "seed": 3340,
-  "det": "de",
-  "asr": " Das ist jetzt das dritte Mal diese Woche. Glaubst du, ich habe nichts Besseres zu tun?",
-  "wer": 0.0
+  "alts": [
+   "de_l4_s3341.mp3",
+   "de_l4_s3342.mp3"
+  ]
  },
  {
   "file": "de_l5_s3350.mp3",
@@ -559,9 +948,10 @@
   "cfg": 1.5,
   "seconds": 5.4,
   "seed": 3350,
-  "det": "de",
-  "asr": " Ich habe ihm nie gesagt, wie viel er mir bedeutet hat. Und jetzt ist es zu spät.",
-  "wer": 0.0
+  "alts": [
+   "de_l5_s3351.mp3",
+   "de_l5_s3352.mp3"
+  ]
  },
  {
   "file": "de_l6_s3360.mp3",
@@ -573,9 +963,10 @@
   "cfg": 1.5,
   "seconds": 3.4,
   "seed": 3360,
-  "det": "de",
-  "asr": " Schau mal, es schneit! Der erste Schnee in diesem Jahr!",
-  "wer": 0.0
+  "alts": [
+   "de_l6_s3361.mp3",
+   "de_l6_s3362.mp3"
+  ]
  },
  {
   "file": "de_l7_s3370.mp3",
@@ -587,9 +978,130 @@
   "cfg": 1.5,
   "seconds": 2.4,
   "seed": 3370,
-  "det": "de",
-  "asr": " Alle Mann an Deck! Wir laufen auf Grund!",
-  "wer": 0.0
+  "alts": [
+   "de_l7_s3371.mp3",
+   "de_l7_s3372.mp3"
+  ]
+ },
+ {
+  "file": "de_l8_s9301.mp3",
+  "item": "l8",
+  "group": "languages",
+  "lang": "de",
+  "text": "[sighing] Schon wieder Montag. Noch ein Meeting, das eine E-Mail hätte sein können.",
+  "label": "sighing",
+  "cfg": 1.5,
+  "seconds": 4.7,
+  "seed": 9301,
+  "alts": [
+   "de_l8_s9300.mp3",
+   "de_l8_s9302.mp3"
+  ]
+ },
+ {
+  "file": "de_l9_s9310.mp3",
+  "item": "l9",
+  "group": "languages",
+  "lang": "de",
+  "text": "[tired] Ich bin die ganze Nacht gefahren. Gib mir bitte fünf Minuten.",
+  "label": "tired",
+  "cfg": 1.5,
+  "seconds": 3.3,
+  "seed": 9310,
+  "alts": [
+   "de_l9_s9311.mp3",
+   "de_l9_s9312.mp3"
+  ]
+ },
+ {
+  "file": "de_l10_s9320.mp3",
+  "item": "l10",
+  "group": "languages",
+  "lang": "de",
+  "text": "[playful] Rate mal, wer das letzte Stück Kuchen gegessen hat? Du jedenfalls nicht.",
+  "label": "playful",
+  "cfg": 1.5,
+  "seconds": 4.0,
+  "seed": 9320,
+  "alts": [
+   "de_l10_s9321.mp3",
+   "de_l10_s9322.mp3"
+  ]
+ },
+ {
+  "file": "de_l11_s9330.mp3",
+  "item": "l11",
+  "group": "languages",
+  "lang": "de",
+  "text": "[scared] Hast du das gehört? Da oben auf dem Dachboden hat sich etwas bewegt.",
+  "label": "scared",
+  "cfg": 1.5,
+  "seconds": 3.4,
+  "seed": 9330,
+  "alts": [
+   "de_l11_s9331.mp3",
+   "de_l11_s9332.mp3"
+  ]
+ },
+ {
+  "file": "de_l12_s9340.mp3",
+  "item": "l12",
+  "group": "languages",
+  "lang": "de",
+  "text": "[voice breaking] Er hat gesagt, er ist zum Abendessen zurück. Er hat es versprochen.",
+  "label": "voice breaking",
+  "cfg": 1.5,
+  "seconds": 3.7,
+  "seed": 9340,
+  "alts": [
+   "de_l12_s9341.mp3",
+   "de_l12_s9342.mp3"
+  ]
+ },
+ {
+  "file": "de_l13_s9350.mp3",
+  "item": "l13",
+  "group": "languages",
+  "lang": "de",
+  "text": "Ich öffnete die Tür, und da stand er. [pause] Genau so, wie ich ihn in Erinnerung hatte.",
+  "label": "pause",
+  "cfg": 1.5,
+  "seconds": 5.3,
+  "seed": 9350,
+  "alts": [
+   "de_l13_s9351.mp3",
+   "de_l13_s9352.mp3"
+  ]
+ },
+ {
+  "file": "de_l14_s9360.mp3",
+  "item": "l14",
+  "group": "languages",
+  "lang": "de",
+  "text": "[slowly] Leg das Messer weg. Heute Nacht muss niemand mehr verletzt werden.",
+  "label": "slowly",
+  "cfg": 1.5,
+  "seconds": 3.7,
+  "seed": 9360,
+  "alts": [
+   "de_l14_s9361.mp3",
+   "de_l14_s9362.mp3"
+  ]
+ },
+ {
+  "file": "de_l15_s9370.mp3",
+  "item": "l15",
+  "group": "languages",
+  "lang": "de",
+  "text": "[softly] Schlaf jetzt, meine Kleine. Morgen früh ist das Gewitter vorbei.",
+  "label": "softly",
+  "cfg": 1.5,
+  "seconds": 3.7,
+  "seed": 9370,
+  "alts": [
+   "de_l15_s9371.mp3",
+   "de_l15_s9372.mp3"
+  ]
  },
  {
   "file": "de_ctx_angry_s5030.mp3",
@@ -604,9 +1116,10 @@
   "semantic_left": [
    "Du hörst mir nie zu! Ich habe es so satt!"
   ],
-  "det": "de",
-  "asr": " »Schön. Mach doch, was du willst.«",
-  "wer": 0.0
+  "alts": [
+   "de_ctx_angry_s5031.mp3",
+   "de_ctx_angry_s5032.mp3"
+  ]
  },
  {
   "file": "de_ctx_sad_s5030.mp3",
@@ -621,9 +1134,10 @@
   "semantic_left": [
    "Sie hat mir gesagt, dass sie morgen geht und nicht mehr zurückkommt."
   ],
-  "det": "de",
-  "asr": " Schön, mach doch, was du willst.",
-  "wer": 0.0
+  "alts": [
+   "de_ctx_sad_s5031.mp3",
+   "de_ctx_sad_s5032.mp3"
+  ]
  },
  {
   "file": "de_story_s7030.mp3",
@@ -635,9 +1149,7 @@
   "cfg": 1.5,
   "seconds": 26.4,
   "seed": 7030,
-  "det": "de",
-  "asr": " In einem kleinen Dorf am Rande des Schwarzwalds lebte ein Uhrmacher, dessen Uhren niemals stehen blieben. Die Leute erzählten sich. Er habe sein Handwerk von einem Fremden gelernt, der eines Winters bei ihm Unterschlupf gesucht hatte. Als der Uhrmacher alt wurde, suchte er lange nach einem Lehrling, doch niemand hatte die nötige Geduld. Bis eines Morgens ein Mädchen vor seiner Tür stand und fragte, warum seine Uhren alle ein wenig zu laut tickten.",
-  "wer": 0.0
+  "alts": []
  },
  {
   "file": "ru_l0_s3400.mp3",
@@ -649,9 +1161,10 @@
   "cfg": 1.5,
   "seconds": 5.5,
   "seed": 3400,
-  "det": "ru",
-  "asr": " Зима в тот год пришла рано, и уже в октябре река покрылась тонким прозрачным льдом.",
-  "wer": 0.0
+  "alts": [
+   "ru_l0_s3401.mp3",
+   "ru_l0_s3402.mp3"
+  ]
  },
  {
   "file": "ru_l1_s3410.mp3",
@@ -663,9 +1176,10 @@
   "cfg": 1.5,
   "seconds": 6.5,
   "seed": 3410,
-  "det": "ru",
-  "asr": " Старый дом на окраине давно пустовал, но по ночам в его окнах иногда горел свет.",
-  "wer": 0.0
+  "alts": [
+   "ru_l1_s3411.mp3",
+   "ru_l1_s3412.mp3"
+  ]
  },
  {
   "file": "ru_l2_s3420.mp3",
@@ -677,9 +1191,10 @@
   "cfg": 1.5,
   "seconds": 4.6,
   "seed": 3420,
-  "det": "ru",
-  "asr": " Ты перепутал соль с сахаром? Неудивительно, что чай такой странный!",
-  "wer": 0.0
+  "alts": [
+   "ru_l2_s3421.mp3",
+   "ru_l2_s3422.mp3"
+  ]
  },
  {
   "file": "ru_l3_s3430.mp3",
@@ -691,9 +1206,10 @@
   "cfg": 1.5,
   "seconds": 3.6,
   "seed": 3430,
-  "det": "ru",
-  "asr": " «Тише, не шуми. Они где-то совсем рядом, я слышу шаги».",
-  "wer": 0.0
+  "alts": [
+   "ru_l3_s3431.mp3",
+   "ru_l3_s3432.mp3"
+  ]
  },
  {
   "file": "ru_l4_s3440.mp3",
@@ -705,9 +1221,10 @@
   "cfg": 1.5,
   "seconds": 4.6,
   "seed": 3440,
-  "det": "ru",
-  "asr": " Я тебе сто раз говорил! Не трогай мои документы! Сто раз!",
-  "wer": 0.0
+  "alts": [
+   "ru_l4_s3441.mp3",
+   "ru_l4_s3442.mp3"
+  ]
  },
  {
   "file": "ru_l5_s3450.mp3",
@@ -719,9 +1236,10 @@
   "cfg": 1.5,
   "seconds": 3.7,
   "seed": 3450,
-  "det": "ru",
-  "asr": " Мама каждое утро пекла блины, теперь на кухне так тихо.",
-  "wer": 0.0
+  "alts": [
+   "ru_l5_s3451.mp3",
+   "ru_l5_s3452.mp3"
+  ]
  },
  {
   "file": "ru_l6_s3461.mp3",
@@ -733,9 +1251,10 @@
   "cfg": 1.5,
   "seconds": 3.6,
   "seed": 3461,
-  "det": "ru",
-  "asr": " Получилось. Ты видишь? Он летит. Он правда летит.",
-  "wer": 0.0
+  "alts": [
+   "ru_l6_s3460.mp3",
+   "ru_l6_s3462.mp3"
+  ]
  },
  {
   "file": "ru_l7_s3471.mp3",
@@ -747,9 +1266,130 @@
   "cfg": 1.5,
   "seconds": 3.6,
   "seed": 3471,
-  "det": "ru",
-  "asr": " Все наружу! Здание сейчас обрушится! Бегом!",
-  "wer": 0.0
+  "alts": [
+   "ru_l7_s3470.mp3",
+   "ru_l7_s3472.mp3"
+  ]
+ },
+ {
+  "file": "ru_l8_s9400.mp3",
+  "item": "l8",
+  "group": "languages",
+  "lang": "ru",
+  "text": "[sighing] Опять понедельник. Опять совещание, которое могло быть письмом.",
+  "label": "sighing",
+  "cfg": 1.5,
+  "seconds": 5.4,
+  "seed": 9400,
+  "alts": [
+   "ru_l8_s9401.mp3",
+   "ru_l8_s9402.mp3"
+  ]
+ },
+ {
+  "file": "ru_l9_s9410.mp3",
+  "item": "l9",
+  "group": "languages",
+  "lang": "ru",
+  "text": "[tired] Я ехал всю ночь. Дай мне хотя бы пять минут, пожалуйста.",
+  "label": "tired",
+  "cfg": 1.5,
+  "seconds": 4.0,
+  "seed": 9410,
+  "alts": [
+   "ru_l9_s9411.mp3",
+   "ru_l9_s9412.mp3"
+  ]
+ },
+ {
+  "file": "ru_l10_s9420.mp3",
+  "item": "l10",
+  "group": "languages",
+  "lang": "ru",
+  "text": "[playful] Угадай, кто съел последний кусок торта? Уж точно не ты.",
+  "label": "playful",
+  "cfg": 1.5,
+  "seconds": 4.1,
+  "seed": 9420,
+  "alts": [
+   "ru_l10_s9421.mp3",
+   "ru_l10_s9422.mp3"
+  ]
+ },
+ {
+  "file": "ru_l11_s9430.mp3",
+  "item": "l11",
+  "group": "languages",
+  "lang": "ru",
+  "text": "[scared] Ты слышал? На чердаке что-то шевельнулось.",
+  "label": "scared",
+  "cfg": 1.5,
+  "seconds": 3.0,
+  "seed": 9430,
+  "alts": [
+   "ru_l11_s9431.mp3",
+   "ru_l11_s9432.mp3"
+  ]
+ },
+ {
+  "file": "ru_l12_s9440.mp3",
+  "item": "l12",
+  "group": "languages",
+  "lang": "ru",
+  "text": "[voice breaking] Он обещал вернуться к ужину. Он мне обещал.",
+  "label": "voice breaking",
+  "cfg": 1.5,
+  "seconds": 3.2,
+  "seed": 9440,
+  "alts": [
+   "ru_l12_s9441.mp3",
+   "ru_l12_s9442.mp3"
+  ]
+ },
+ {
+  "file": "ru_l13_s9450.mp3",
+  "item": "l13",
+  "group": "languages",
+  "lang": "ru",
+  "text": "Я открыла дверь, и он стоял там. [pause] Точно такой, каким я его помнила.",
+  "label": "pause",
+  "cfg": 1.5,
+  "seconds": 4.4,
+  "seed": 9450,
+  "alts": [
+   "ru_l13_s9451.mp3",
+   "ru_l13_s9452.mp3"
+  ]
+ },
+ {
+  "file": "ru_l14_s9460.mp3",
+  "item": "l14",
+  "group": "languages",
+  "lang": "ru",
+  "text": "[slowly] Положи нож. Сегодня больше никто не должен пострадать.",
+  "label": "slowly",
+  "cfg": 1.5,
+  "seconds": 3.5,
+  "seed": 9460,
+  "alts": [
+   "ru_l14_s9461.mp3",
+   "ru_l14_s9462.mp3"
+  ]
+ },
+ {
+  "file": "ru_l15_s9470.mp3",
+  "item": "l15",
+  "group": "languages",
+  "lang": "ru",
+  "text": "[softly] Спи, моя маленькая. К утру гроза пройдёт.",
+  "label": "softly",
+  "cfg": 1.5,
+  "seconds": 2.6,
+  "seed": 9470,
+  "alts": [
+   "ru_l15_s9471.mp3",
+   "ru_l15_s9472.mp3"
+  ]
  },
  {
   "file": "ru_ctx_angry_s5040.mp3",
@@ -764,9 +1404,10 @@
   "semantic_left": [
    "Ты меня никогда не слушаешь! Мне это надоело!"
   ],
-  "det": "ru",
-  "asr": " «Ладно, делай, что хочешь».",
-  "wer": 0.0
+  "alts": [
+   "ru_ctx_angry_s5041.mp3",
+   "ru_ctx_angry_s5042.mp3"
+  ]
  },
  {
   "file": "ru_ctx_sad_s5040.mp3",
@@ -781,9 +1422,10 @@
   "semantic_left": [
    "Она сказала, что завтра уезжает и больше не вернётся."
   ],
-  "det": "ru",
-  "asr": " Ладно, делай что хочешь.",
-  "wer": 0.0
+  "alts": [
+   "ru_ctx_sad_s5041.mp3",
+   "ru_ctx_sad_s5042.mp3"
+  ]
  },
  {
   "file": "ru_story_s7040.mp3",
@@ -795,9 +1437,7 @@
   "cfg": 1.5,
   "seconds": 24.6,
   "seed": 7040,
-  "det": "ru",
-  "asr": " Жил-был в далекой северной деревне мальчик по имени Ваня, который умел разговаривать с ветром. Каждый вечер он поднимался на холм за околицей и рассказывал ветру о своем дне. Ветер в ответ приносил ему запахи далеких лесов и шум незнакомых городов. Однажды ветер принес ему письмо, написанное на языке, которого никто в деревне не знал.",
-  "wer": 0.0
+  "alts": []
  },
  {
   "file": "fr_l0_s3500.mp3",
@@ -809,9 +1449,10 @@
   "cfg": 1.5,
   "seconds": 3.9,
   "seed": 3500,
-  "det": "fr",
-  "asr": " La petite librairie du coin sentait le papier ancien et le café trop fort.",
-  "wer": 0.0
+  "alts": [
+   "fr_l0_s3501.mp3",
+   "fr_l0_s3502.mp3"
+  ]
  },
  {
   "file": "fr_l1_s3510.mp3",
@@ -823,9 +1464,10 @@
   "cfg": 1.5,
   "seconds": 3.9,
   "seed": 3510,
-  "det": "fr",
-  "asr": " Chaque été, toute la famille se retrouvait dans la vieille maison au bord de la mer.",
-  "wer": 0.0
+  "alts": [
+   "fr_l1_s3511.mp3",
+   "fr_l1_s3512.mp3"
+  ]
  },
  {
   "file": "fr_l2_s3520.mp3",
@@ -837,9 +1479,10 @@
   "cfg": 1.5,
   "seconds": 4.7,
   "seed": 3520,
-  "det": "fr",
-  "asr": " Tu as vraiment demandé ton chemin à une statue ? Ah, j'aurais tout donné pour voir ça.",
-  "wer": 0.0
+  "alts": [
+   "fr_l2_s3521.mp3",
+   "fr_l2_s3522.mp3"
+  ]
  },
  {
   "file": "fr_l3_s3530.mp3",
@@ -851,9 +1494,10 @@
   "cfg": 1.5,
   "seconds": 3.4,
   "seed": 3530,
-  "det": "fr",
-  "asr": " Ne fais pas de bruit. Le gardien fait sa ronde juste derrière la porte.",
-  "wer": 0.0
+  "alts": [
+   "fr_l3_s3531.mp3",
+   "fr_l3_s3532.mp3"
+  ]
  },
  {
   "file": "fr_l4_s3540.mp3",
@@ -865,9 +1509,10 @@
   "cfg": 1.5,
   "seconds": 3.9,
   "seed": 3540,
-  "det": "fr",
-  "asr": " Tu m'avais juré que tu ne recommencerais pas. Et voilà, encore une fois.",
-  "wer": 0.0
+  "alts": [
+   "fr_l4_s3541.mp3",
+   "fr_l4_s3542.mp3"
+  ]
  },
  {
   "file": "fr_l5_s3550.mp3",
@@ -879,9 +1524,10 @@
   "cfg": 1.5,
   "seconds": 4.3,
   "seed": 3550,
-  "det": "fr",
-  "asr": " Elle laissait toujours une lumière allumée pour moi. Ce soir, la maison est toute noire.",
-  "wer": 0.0
+  "alts": [
+   "fr_l5_s3551.mp3",
+   "fr_l5_s3552.mp3"
+  ]
  },
  {
   "file": "fr_l6_s3560.mp3",
@@ -893,9 +1539,10 @@
   "cfg": 1.5,
   "seconds": 3.6,
   "seed": 3560,
-  "det": "fr",
-  "asr": " On a réussi ! Le spectacle affiche complet pour toute la semaine !",
-  "wer": 0.0
+  "alts": [
+   "fr_l6_s3561.mp3",
+   "fr_l6_s3562.mp3"
+  ]
  },
  {
   "file": "fr_l7_s3570.mp3",
@@ -907,9 +1554,130 @@
   "cfg": 1.5,
   "seconds": 3.1,
   "seed": 3570,
-  "det": "fr",
-  "asr": " Tout le monde dehors ! Le feu arrive par l'escalier !",
-  "wer": 0.0
+  "alts": [
+   "fr_l7_s3571.mp3",
+   "fr_l7_s3572.mp3"
+  ]
+ },
+ {
+  "file": "fr_l8_s9500.mp3",
+  "item": "l8",
+  "group": "languages",
+  "lang": "fr",
+  "text": "[sighing] Encore un lundi. Encore une réunion qui aurait pu être un mail.",
+  "label": "sighing",
+  "cfg": 1.5,
+  "seconds": 4.1,
+  "seed": 9500,
+  "alts": [
+   "fr_l8_s9501.mp3",
+   "fr_l8_s9502.mp3"
+  ]
+ },
+ {
+  "file": "fr_l9_s9510.mp3",
+  "item": "l9",
+  "group": "languages",
+  "lang": "fr",
+  "text": "[tired] J'ai conduit toute la nuit. Laisse-moi juste cinq minutes, s'il te plaît.",
+  "label": "tired",
+  "cfg": 1.5,
+  "seconds": 4.1,
+  "seed": 9510,
+  "alts": [
+   "fr_l9_s9511.mp3",
+   "fr_l9_s9512.mp3"
+  ]
+ },
+ {
+  "file": "fr_l10_s9520.mp3",
+  "item": "l10",
+  "group": "languages",
+  "lang": "fr",
+  "text": "[playful] Devine qui a mangé la dernière part de gâteau ? Pas toi, en tout cas.",
+  "label": "playful",
+  "cfg": 1.5,
+  "seconds": 3.8,
+  "seed": 9520,
+  "alts": [
+   "fr_l10_s9521.mp3",
+   "fr_l10_s9522.mp3"
+  ]
+ },
+ {
+  "file": "fr_l11_s9530.mp3",
+  "item": "l11",
+  "group": "languages",
+  "lang": "fr",
+  "text": "[scared] Tu as entendu ? Quelque chose a bougé dans le grenier.",
+  "label": "scared",
+  "cfg": 1.5,
+  "seconds": 2.9,
+  "seed": 9530,
+  "alts": [
+   "fr_l11_s9531.mp3",
+   "fr_l11_s9532.mp3"
+  ]
+ },
+ {
+  "file": "fr_l12_s9540.mp3",
+  "item": "l12",
+  "group": "languages",
+  "lang": "fr",
+  "text": "[voice breaking] Il avait dit qu'il rentrerait pour le dîner. Il me l'avait promis.",
+  "label": "voice breaking",
+  "cfg": 1.5,
+  "seconds": 3.3,
+  "seed": 9540,
+  "alts": [
+   "fr_l12_s9541.mp3",
+   "fr_l12_s9542.mp3"
+  ]
+ },
+ {
+  "file": "fr_l13_s9550.mp3",
+  "item": "l13",
+  "group": "languages",
+  "lang": "fr",
+  "text": "J'ai ouvert la porte, et il était là. [pause] Exactement comme dans mon souvenir.",
+  "label": "pause",
+  "cfg": 1.5,
+  "seconds": 3.7,
+  "seed": 9550,
+  "alts": [
+   "fr_l13_s9551.mp3",
+   "fr_l13_s9552.mp3"
+  ]
+ },
+ {
+  "file": "fr_l14_s9560.mp3",
+  "item": "l14",
+  "group": "languages",
+  "lang": "fr",
+  "text": "[slowly] Pose ce couteau. Personne d'autre ne doit être blessé ce soir.",
+  "label": "slowly",
+  "cfg": 1.5,
+  "seconds": 3.2,
+  "seed": 9560,
+  "alts": [
+   "fr_l14_s9561.mp3",
+   "fr_l14_s9562.mp3"
+  ]
+ },
+ {
+  "file": "fr_l15_s9570.mp3",
+  "item": "l15",
+  "group": "languages",
+  "lang": "fr",
+  "text": "[softly] Dors maintenant, ma petite. L'orage sera passé demain matin.",
+  "label": "softly",
+  "cfg": 1.5,
+  "seconds": 3.3,
+  "seed": 9570,
+  "alts": [
+   "fr_l15_s9571.mp3",
+   "fr_l15_s9572.mp3"
+  ]
  },
  {
   "file": "fr_ctx_angry_s5050.mp3",
@@ -924,9 +1692,10 @@
   "semantic_left": [
    "Tu ne m'écoutes jamais ! J'en ai assez !"
   ],
-  "det": "fr",
-  "asr": " Très bien. Fais ce que tu veux.",
-  "wer": 0.0
+  "alts": [
+   "fr_ctx_angry_s5051.mp3",
+   "fr_ctx_angry_s5052.mp3"
+  ]
  },
  {
   "file": "fr_ctx_sad_s5050.mp3",
@@ -941,9 +1710,10 @@
   "semantic_left": [
    "Elle m'a dit qu'elle part demain, et qu'elle ne reviendra pas."
   ],
-  "det": "fr",
-  "asr": " Très bien, fais ce que tu veux.",
-  "wer": 0.0
+  "alts": [
+   "fr_ctx_sad_s5051.mp3",
+   "fr_ctx_sad_s5052.mp3"
+  ]
  },
  {
   "file": "fr_story_s7050.mp3",
@@ -955,9 +1725,7 @@
   "cfg": 1.5,
   "seconds": 20.6,
   "seed": 7050,
-  "det": "fr",
-  "asr": " Dans un petit village de Provence vivait un boulanger qui se levait chaque nuit à trois heures. Il disait que le pain avait besoin de silence pour bien lever et que les étoiles lui tenaient compagnie. Un matin, en ouvrant son four, il trouva une miche dorée qu'il n'avait jamais pétrie. Sur la croûte, quelqu'un avait gravé un seul mot « Merci ».",
-  "wer": 0.0
+  "alts": []
  },
  {
   "file": "pt_l0_s3601.mp3",
@@ -969,9 +1737,10 @@
   "cfg": 1.5,
   "seconds": 4.2,
   "seed": 3601,
-  "det": "pt",
-  "asr": " O elétrico subia a colina devagar, rangendo em cada curva da cidade antiga.",
-  "wer": 0.0
+  "alts": [
+   "pt_l0_s3600.mp3",
+   "pt_l0_s3602.mp3"
+  ]
  },
  {
   "file": "pt_l1_s3610.mp3",
@@ -983,9 +1752,10 @@
   "cfg": 1.5,
   "seconds": 4.6,
   "seed": 3610,
-  "det": "pt",
-  "asr": " Durante gerações, a família guardou o segredo do mapa escondido no fundo da arca.",
-  "wer": 0.0
+  "alts": [
+   "pt_l1_s3611.mp3",
+   "pt_l1_s3612.mp3"
+  ]
  },
  {
   "file": "pt_l2_s3620.mp3",
@@ -997,9 +1767,10 @@
   "cfg": 1.5,
   "seconds": 4.9,
   "seed": 3620,
-  "det": "pt",
-  "asr": " Tu entraste na reunião com o pijama vestido? Não acredito.",
-  "wer": 0.0
+  "alts": [
+   "pt_l2_s3621.mp3",
+   "pt_l2_s3622.mp3"
+  ]
  },
  {
   "file": "pt_l3_s3630.mp3",
@@ -1011,9 +1782,10 @@
   "cfg": 1.5,
   "seconds": 3.8,
   "seed": 3630,
-  "det": "pt",
-  "asr": " Fala baixo. Se o vizinho nos ouvir, chama logo a polícia.",
-  "wer": 0.0
+  "alts": [
+   "pt_l3_s3631.mp3",
+   "pt_l3_s3632.mp3"
+  ]
  },
  {
   "file": "pt_l4_s3640.mp3",
@@ -1025,9 +1797,10 @@
   "cfg": 1.5,
   "seconds": 3.6,
   "seed": 3640,
-  "det": "pt",
-  "asr": " Disseste que ias tratar disso e afinal não fizeste nada, nada.",
-  "wer": 0.0
+  "alts": [
+   "pt_l4_s3641.mp3",
+   "pt_l4_s3642.mp3"
+  ]
  },
  {
   "file": "pt_l5_s3650.mp3",
@@ -1039,9 +1812,10 @@
   "cfg": 1.5,
   "seconds": 4.6,
   "seed": 3650,
-  "det": "pt",
-  "asr": " O meu pai cantava esta música enquanto pescava. Já não consigo ouvi-la sem chorar.",
-  "wer": 0.0
+  "alts": [
+   "pt_l5_s3651.mp3",
+   "pt_l5_s3652.mp3"
+  ]
  },
  {
   "file": "pt_l6_s3660.mp3",
@@ -1053,9 +1827,10 @@
   "cfg": 1.5,
   "seconds": 3.9,
   "seed": 3660,
-  "det": "pt",
-  "asr": " Conseguimos! O barco aguenta-se! Vamos mesmo chegar à ilha!",
-  "wer": 0.0
+  "alts": [
+   "pt_l6_s3661.mp3",
+   "pt_l6_s3662.mp3"
+  ]
  },
  {
   "file": "pt_l7_s3670.mp3",
@@ -1067,9 +1842,130 @@
   "cfg": 1.5,
   "seconds": 3.2,
   "seed": 3670,
-  "det": "pt",
-  "asr": " Saiam todos daqui! A ponte não aguenta mais peso!",
-  "wer": 0.0
+  "alts": [
+   "pt_l7_s3671.mp3",
+   "pt_l7_s3672.mp3"
+  ]
+ },
+ {
+  "file": "pt_l8_s9601.mp3",
+  "item": "l8",
+  "group": "languages",
+  "lang": "pt",
+  "text": "[sighing] Outra vez segunda-feira. Mais uma reunião que podia ter sido um e-mail.",
+  "label": "sighing",
+  "cfg": 1.5,
+  "seconds": 4.0,
+  "seed": 9601,
+  "alts": [
+   "pt_l8_s9600.mp3",
+   "pt_l8_s9602.mp3"
+  ]
+ },
+ {
+  "file": "pt_l9_s9610.mp3",
+  "item": "l9",
+  "group": "languages",
+  "lang": "pt",
+  "text": "[tired] Conduzi a noite toda. Dá-me só cinco minutos, por favor.",
+  "label": "tired",
+  "cfg": 1.5,
+  "seconds": 3.4,
+  "seed": 9610,
+  "alts": [
+   "pt_l9_s9611.mp3",
+   "pt_l9_s9612.mp3"
+  ]
+ },
+ {
+  "file": "pt_l10_s9620.mp3",
+  "item": "l10",
+  "group": "languages",
+  "lang": "pt",
+  "text": "[playful] Adivinha quem comeu a última fatia de bolo? Tu é que não foste.",
+  "label": "playful",
+  "cfg": 1.5,
+  "seconds": 4.2,
+  "seed": 9620,
+  "alts": [
+   "pt_l10_s9621.mp3",
+   "pt_l10_s9622.mp3"
+  ]
+ },
+ {
+  "file": "pt_l11_s9630.mp3",
+  "item": "l11",
+  "group": "languages",
+  "lang": "pt",
+  "text": "[scared] Ouviste aquilo? Alguma coisa mexeu-se no sótão.",
+  "label": "scared",
+  "cfg": 1.5,
+  "seconds": 3.3,
+  "seed": 9630,
+  "alts": [
+   "pt_l11_s9631.mp3",
+   "pt_l11_s9632.mp3"
+  ]
+ },
+ {
+  "file": "pt_l12_s9640.mp3",
+  "item": "l12",
+  "group": "languages",
+  "lang": "pt",
+  "text": "[voice breaking] Ele disse que vinha jantar. Ele prometeu-me.",
+  "label": "voice breaking",
+  "cfg": 1.5,
+  "seconds": 3.3,
+  "seed": 9640,
+  "alts": [
+   "pt_l12_s9641.mp3",
+   "pt_l12_s9642.mp3"
+  ]
+ },
+ {
+  "file": "pt_l13_s9650.mp3",
+  "item": "l13",
+  "group": "languages",
+  "lang": "pt",
+  "text": "Abri a porta e lá estava ele. [pause] Exatamente como eu me lembrava.",
+  "label": "pause",
+  "cfg": 1.5,
+  "seconds": 4.2,
+  "seed": 9650,
+  "alts": [
+   "pt_l13_s9651.mp3",
+   "pt_l13_s9652.mp3"
+  ]
+ },
+ {
+  "file": "pt_l14_s9661.mp3",
+  "item": "l14",
+  "group": "languages",
+  "lang": "pt",
+  "text": "[slowly] Pousa a faca. Mais ninguém tem de se magoar esta noite.",
+  "label": "slowly",
+  "cfg": 1.5,
+  "seconds": 3.9,
+  "seed": 9661,
+  "alts": [
+   "pt_l14_s9660.mp3",
+   "pt_l14_s9662.mp3"
+  ]
+ },
+ {
+  "file": "pt_l15_s9670.mp3",
+  "item": "l15",
+  "group": "languages",
+  "lang": "pt",
+  "text": "[softly] Dorme agora, pequenina. De manhã a tempestade já passou.",
+  "label": "softly",
+  "cfg": 1.5,
+  "seconds": 3.8,
+  "seed": 9670,
+  "alts": [
+   "pt_l15_s9671.mp3",
+   "pt_l15_s9672.mp3"
+  ]
  },
  {
   "file": "pt_ctx_angry_s5060.mp3",
@@ -1084,9 +1980,10 @@
   "semantic_left": [
    "Tu nunca me ouves! Estou farto disto!"
   ],
-  "det": "pt",
-  "asr": " Está bem. Faz o que quiseres.",
-  "wer": 0.0
+  "alts": [
+   "pt_ctx_angry_s5061.mp3",
+   "pt_ctx_angry_s5062.mp3"
+  ]
  },
  {
   "file": "pt_ctx_sad_s5060.mp3",
@@ -1101,9 +1998,10 @@
   "semantic_left": [
    "Ela disse-me que parte amanhã e que não vai voltar."
   ],
-  "det": "pt",
-  "asr": " Está bem. Faz o que quiseres.",
-  "wer": 0.0
+  "alts": [
+   "pt_ctx_sad_s5061.mp3",
+   "pt_ctx_sad_s5062.mp3"
+  ]
  },
  {
   "file": "pt_story_s7060.mp3",
@@ -1115,9 +2013,7 @@
   "cfg": 1.5,
   "seconds": 21.6,
   "seed": 7060,
-  "det": "pt",
-  "asr": " Numa aldeia junto ao rio vivia um velho barqueiro que conhecia todas as histórias da região. Os miúdos sentavam-se no cais ao fim da tarde para o ouvir falar de piratas, sereias e tesouros perdidos. Ninguém sabia quais das histórias eram verdadeiras. Até ao dia em que uma das crianças encontrou, no lodo do rio, uma moeda de ouro com um nome gravado.",
-  "wer": 0.0
+  "alts": []
  },
  {
   "file": "it_l0_s3700.mp3",
@@ -1129,9 +2025,10 @@
   "cfg": 1.5,
   "seconds": 4.9,
   "seed": 3700,
-  "det": "it",
-  "asr": " Il paese si svegliava lentamente tra il profumo del caffè e il suono delle campane.",
-  "wer": 0.0
+  "alts": [
+   "it_l0_s3701.mp3",
+   "it_l0_s3702.mp3"
+  ]
  },
  {
   "file": "it_l1_s3710.mp3",
@@ -1143,9 +2040,10 @@
   "cfg": 1.5,
   "seconds": 6.0,
   "seed": 3710,
-  "det": "it",
-  "asr": " Nessuno ricordava chi avesse costruito il ponte di pietra, ma tutti sapevano che non era mai crollato.",
-  "wer": 0.0
+  "alts": [
+   "it_l1_s3711.mp3",
+   "it_l1_s3712.mp3"
+  ]
  },
  {
   "file": "it_l2_s3721.mp3",
@@ -1157,9 +2055,10 @@
   "cfg": 1.5,
   "seconds": 3.7,
   "seed": 3721,
-  "det": "it",
-  "asr": " Hai davvero scambiato il gatto del vicino per una volpe? Che scena.",
-  "wer": 0.0
+  "alts": [
+   "it_l2_s3720.mp3",
+   "it_l2_s3722.mp3"
+  ]
  },
  {
   "file": "it_l3_s3730.mp3",
@@ -1171,9 +2070,10 @@
   "cfg": 1.5,
   "seconds": 3.7,
   "seed": 3730,
-  "det": "it",
-  "asr": " «Zitto! Non muoverti! C'è qualcuno nel corridoio!»",
-  "wer": 0.0
+  "alts": [
+   "it_l3_s3731.mp3",
+   "it_l3_s3732.mp3"
+  ]
  },
  {
   "file": "it_l4_s3740.mp3",
@@ -1185,9 +2085,10 @@
   "cfg": 1.5,
   "seconds": 3.9,
   "seed": 3740,
-  "det": "it",
-  "asr": " Te l'ho detto mille volte di non toccare la mia macchina. Mille volte!",
-  "wer": 0.0
+  "alts": [
+   "it_l4_s3741.mp3",
+   "it_l4_s3742.mp3"
+  ]
  },
  {
   "file": "it_l5_s3750.mp3",
@@ -1199,9 +2100,10 @@
   "cfg": 1.5,
   "seconds": 3.9,
   "seed": 3750,
-  "det": "it",
-  "asr": " Mia nonna mi aspettava sempre alla finestra. Oggi la finestra è chiusa.",
-  "wer": 0.0
+  "alts": [
+   "it_l5_s3751.mp3",
+   "it_l5_s3752.mp3"
+  ]
  },
  {
   "file": "it_l6_s3760.mp3",
@@ -1213,9 +2115,10 @@
   "cfg": 1.5,
   "seconds": 3.6,
   "seed": 3760,
-  "det": "it",
-  "asr": " Ce l'abbiamo fatta! Ci hanno preso! Partiamo a settembre!",
-  "wer": 0.0
+  "alts": [
+   "it_l6_s3761.mp3",
+   "it_l6_s3762.mp3"
+  ]
  },
  {
   "file": "it_l7_s3770.mp3",
@@ -1227,9 +2130,130 @@
   "cfg": 1.5,
   "seconds": 3.3,
   "seed": 3770,
-  "det": "it",
-  "asr": " Tutti fuori, subito! Il fiume sta straripando!",
-  "wer": 0.0
+  "alts": [
+   "it_l7_s3771.mp3",
+   "it_l7_s3772.mp3"
+  ]
+ },
+ {
+  "file": "it_l8_s9700.mp3",
+  "item": "l8",
+  "group": "languages",
+  "lang": "it",
+  "text": "[sighing] Di nuovo lunedì. Un'altra riunione che poteva essere una mail.",
+  "label": "sighing",
+  "cfg": 1.5,
+  "seconds": 5.0,
+  "seed": 9700,
+  "alts": [
+   "it_l8_s9701.mp3",
+   "it_l8_s9702.mp3"
+  ]
+ },
+ {
+  "file": "it_l9_s9710.mp3",
+  "item": "l9",
+  "group": "languages",
+  "lang": "it",
+  "text": "[tired] Ho guidato tutta la notte. Dammi solo cinque minuti, per favore.",
+  "label": "tired",
+  "cfg": 1.5,
+  "seconds": 3.8,
+  "seed": 9710,
+  "alts": [
+   "it_l9_s9711.mp3",
+   "it_l9_s9712.mp3"
+  ]
+ },
+ {
+  "file": "it_l10_s9720.mp3",
+  "item": "l10",
+  "group": "languages",
+  "lang": "it",
+  "text": "[playful] Indovina chi ha mangiato l'ultima fetta di torta? Di sicuro non tu.",
+  "label": "playful",
+  "cfg": 1.5,
+  "seconds": 3.9,
+  "seed": 9720,
+  "alts": [
+   "it_l10_s9721.mp3",
+   "it_l10_s9722.mp3"
+  ]
+ },
+ {
+  "file": "it_l11_s9730.mp3",
+  "item": "l11",
+  "group": "languages",
+  "lang": "it",
+  "text": "[scared] Hai sentito? Qualcosa si è mosso in soffitta.",
+  "label": "scared",
+  "cfg": 1.5,
+  "seconds": 2.9,
+  "seed": 9730,
+  "alts": [
+   "it_l11_s9731.mp3",
+   "it_l11_s9732.mp3"
+  ]
+ },
+ {
+  "file": "it_l12_s9740.mp3",
+  "item": "l12",
+  "group": "languages",
+  "lang": "it",
+  "text": "[voice breaking] Aveva detto che sarebbe tornato per cena. Me l'aveva promesso.",
+  "label": "voice breaking",
+  "cfg": 1.5,
+  "seconds": 5.6,
+  "seed": 9740,
+  "alts": [
+   "it_l12_s9741.mp3",
+   "it_l12_s9742.mp3"
+  ]
+ },
+ {
+  "file": "it_l13_s9750.mp3",
+  "item": "l13",
+  "group": "languages",
+  "lang": "it",
+  "text": "Ho aperto la porta, ed era lì. [pause] Esattamente come me lo ricordavo.",
+  "label": "pause",
+  "cfg": 1.5,
+  "seconds": 4.4,
+  "seed": 9750,
+  "alts": [
+   "it_l13_s9751.mp3",
+   "it_l13_s9752.mp3"
+  ]
+ },
+ {
+  "file": "it_l14_s9760.mp3",
+  "item": "l14",
+  "group": "languages",
+  "lang": "it",
+  "text": "[slowly] Metti giù il coltello. Nessun altro deve farsi male stanotte.",
+  "label": "slowly",
+  "cfg": 1.5,
+  "seconds": 3.9,
+  "seed": 9760,
+  "alts": [
+   "it_l14_s9761.mp3",
+   "it_l14_s9762.mp3"
+  ]
+ },
+ {
+  "file": "it_l15_s9770.mp3",
+  "item": "l15",
+  "group": "languages",
+  "lang": "it",
+  "text": "[softly] Dormi adesso, piccola. Domattina il temporale sarà passato.",
+  "label": "softly",
+  "cfg": 1.5,
+  "seconds": 3.5,
+  "seed": 9770,
+  "alts": [
+   "it_l15_s9771.mp3",
+   "it_l15_s9772.mp3"
+  ]
  },
  {
   "file": "it_ctx_angry_s5070.mp3",
@@ -1244,9 +2268,10 @@
   "semantic_left": [
    "Non mi ascolti mai! Sono stufo di tutto questo!"
   ],
-  "det": "it",
-  "asr": " Va bene, fai quello che vuoi.",
-  "wer": 0.0
+  "alts": [
+   "it_ctx_angry_s5071.mp3",
+   "it_ctx_angry_s5072.mp3"
+  ]
  },
  {
   "file": "it_ctx_sad_s5070.mp3",
@@ -1261,9 +2286,10 @@
   "semantic_left": [
    "Mi ha detto che parte domani e che non tornerà più."
   ],
-  "det": "it",
-  "asr": " Va bene, fai quello che vuoi.",
-  "wer": 0.0
+  "alts": [
+   "it_ctx_sad_s5071.mp3",
+   "it_ctx_sad_s5072.mp3"
+  ]
  },
  {
   "file": "it_story_s7072.mp3",
@@ -1275,8 +2301,6 @@
   "cfg": 1.5,
   "seconds": 26.9,
   "seed": 7072,
-  "det": "it",
-  "asr": " In un piccolo borgo sulle colline toscane viveva un liutaio che costruiva violini per i musicisti di tutto il mondo. Diceva che ogni pezzo di legno aveva già una voce e che il suo compito era soltanto ascoltarla. Un giorno gli portarono un ceppo di quercia antica, nero e pieno di nodi. Lavorò per un anno intero e quando finalmente suonò la prima nota tutto il paese si fermò ad ascoltare.",
-  "wer": 0.0
+  "alts": []
  }
 ]

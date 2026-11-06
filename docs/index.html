@@ -73,6 +73,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .sample .text { color: var(--ink); }
 .sample .tag { color: var(--accent-2); font-family: "JetBrains Mono", monospace; font-size: 14px; }
 audio { width: 100%; height: 36px; }
+.alts summary { cursor: pointer; color: var(--ink-3); font-size: 13px; }
+.alts audio { margin-top: 6px; height: 32px; }
 .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; }
 pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; overflow-x: auto; font: 13.5px/1.55 "JetBrains Mono", monospace; color: var(--ink); }
 .note { color: var(--ink-3); font-size: 14px; }
@@ -270,7 +272,7 @@ footer { margin-top: 56px; padding: 28px 0 48px; border-top: 1px solid var(--lin
 
 <section id="samples">
   <h2>Samples</h2>
-  <p class="sub">Checkpoint 120k, <code>cfg=1.5</code>, no voice prompt: the voices are the model's own. Every language has its own texts. Each item was generated 3 times and one take was selected with Whisper (language identification and transcript).</p>
+  <p class="sub">Checkpoint 120k, <code>cfg=1.5</code>, no voice prompt: the voices are the model's own. Every language has its own texts. Each item was generated 3 times; the take shown first was selected with Whisper (language identification and transcript), the other takes are under each sample.</p>
   <div class="tabs" id="langtabs" role="tablist" aria-label="Language"></div>
   <h3 id="lines-h">Lines</h3>
   <div class="two" id="langsamples"></div>
@@ -374,7 +376,9 @@ audio = fc.decode(codec, codes[None].cuda())[0].float().cpu().numpy()   # 44.1 k
     var d = document.createElement("div"); d.className = "sample";
     d.innerHTML = '<div class="meta"><span class="pill">' + esc(s.label) + "</span>" + (extra || "") + '<span class="note">' + s.seconds + " s</span></div>" +
       (s.semantic_left ? '<div class="note">Context: “' + esc(s.semantic_left[0]) + "”</div>" : "") +
-      '<div class="text">' + fmt(s.text) + '</div><audio controls preload="none" src="samples/' + s.file + '"></audio>';
+      '<div class="text">' + fmt(s.text) + '</div><audio controls preload="none" src="samples/' + s.file + '"></audio>' +
+      (s.alts && s.alts.length ? '<details class="alts"><summary>' + s.alts.length + ' other take' + (s.alts.length > 1 ? "s" : "") + " (other seeds)</summary>" +
+        s.alts.map(function (f) { return '<audio controls preload="none" src="samples/' + f + '"></audio>'; }).join("") + "</details>" : "");
     return d;
   }
   fetch("samples/manifest.json").then(function (r) { return r.json(); }).then(function (m) {
