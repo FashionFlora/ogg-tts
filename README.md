@@ -5,7 +5,7 @@
 OGG TTS is named after the trolls of *The Witcher*. Its planned siblings are **ROGG** and **POGG**: the three
 architectures compared in the technical report. Like its namesakes, OGG talks a lot.
 
-- Model weights and model card: https://huggingface.co/FashionFlora/ogg-tts (published at checkpoint 20k).
+- Model weights and model card: https://huggingface.co/FashionFlora/ogg-tts (current release: checkpoint 120k).
 - Playground: https://huggingface.co/spaces/FashionFlora/ogg-tts
 - Status: pre-training in progress (400k steps planned).
 
@@ -25,59 +25,50 @@ Built with Fish Audio.
   - emotion: `[angry]` `[frustrated]` `[excited]` `[tired]` `[playful]` `[sad]` `[scared]` `[shouting]`;
   - delivery: `[whispering]` `[softly]` `[voice breaking]` `[singing]` `[pause]` `[slowly]`;
   - vocal events: `[laughing]` `[sighing]` `[gasping]` `[panting]` `[coughing]` `[clears throat]` `[sniffling]` `[scoffing]` `[yawning]` `[humming]`.
-- **Multi-speaker scenes** in one pass. Turn markers name either known speakers or arbitrary voices (S1, S2, …), each with its own short prompt.
+- **Dialogue and long text with context:** each line is generated from its speaker's prompt, with the neighbouring lines as text context (`--before`, `--after`), so the delivery fits the scene.
 - **Streaming:** audio is produced block by block (0.74 s blocks).
 
 ## Architecture
 
 | Part | |
 |---|---|
-| Backbone | OmniVoice (Qwen3-0.6B, masked discrete diffusion), fine-tuned for **block diffusion** (LLaDA2.0 / BD3-LM style): bidirectional inside a block of 16 frames, block-causal across blocks |
-| Acoustic decoder | MTP: 9 chained transformer layers, one per residual codebook (164M params), attending over frames |
+| Backbone | OmniVoice (Qwen3-0.6B, masked discrete diffusion), fine-tuned for **block diffusion** (LLaDA2.0 / BD3-LM style): bidirectional inside a block of 16 frames, block-causal across blocks; earlier blocks are seen with all 10 codebooks |
+| Acoustic decoder | Axial MTP (110M params): 6 layers over a (frame × codebook) grid, each with attention across the codebooks of a frame and across the frames of a codebook |
+| Total | ~0.75B parameters (codec excluded) |
 | Codec | Fish Audio Drama 3 / S2 codec: 44.1 kHz, 21.53 frames/s, 1 semantic codebook (4096) + 9 residual (1024) |
 
 **Generation of each block:**
-1. The backbone unmasks the semantic tokens of the block in 8 confidence-ordered iterations, with classifier-free guidance.
-2. The MTP fills the 9 residual codebooks of the whole block at once.
+1. The backbone unmasks the semantic tokens of the block in 6 confidence-ordered iterations, with classifier-free guidance.
+2. The axial MTP fills the 9 residual codebooks of the block, one codebook per step, all frames at once.
 3. The codec decodes the block to audio.
 
-Finished blocks never change, so they can be streamed and cached. The model decides the length itself (END token + Rainbow Padding).
+Finished blocks never change, so they can be streamed and cached (KV cache). The model decides the length itself (END token).
 
-**Training sequence:**
-
-```
-[lang + instruct] [text] [prompt frames (10 codes)] [clean target blocks] [noisy target blocks]
-```
-
-**Attention:**
-- context sees context;
-- clean block *b* sees the context and clean blocks ≤ *b*;
-- noisy block *b* sees the context, clean blocks < *b*, and itself.
+**Guidance (`--cfg`)** also sets the pace: 1–1.5 gives the natural tempo of the voice, 2 speaks faster and more pointedly.
 
 See `ogg_tts/omnifish.py`.
 
-## Training run (v0)
+## Training
 
-- **Data:** ~8.2k hours of professional voice acting. Sources: multi-cast audiobook productions, single-narrator audiobooks, and voiced dialogue
-  from four AAA games. 16.6k speakers, 8 languages.
+- **Data:** about 8,200 hours of studio-quality speech in 8 languages, a private collection (not publicly available).
 - **Emotion tags:** produced by an audio-LLM pass (Gemini) that tags only what is audible.
 - **Hardware:** 1× NVIDIA RTX PRO 6000 Blackwell.
 
-Full details are in the model card on Hugging Face.
+Evaluation results are in the model card on Hugging Face.
 
 ## Repository
 
 ```
 ogg_tts/
   omnifish.py         model: OmniVoice backbone + semantic head + MTP decoder, block attention
-  train_omnifish.py   training (block diffusion + MTP)
-  infer_omnifish.py   inference and demos
+  train_omnifish.py   training of the first release (v0)
+  infer_omnifish.py   inference (KV-cached block decoding)
   fish_codec.py       Fish codec loading (encode / decode)
   encode_tokens.py    audio -> Fish tokens
   qwenfish.py         autoregressive baseline (Qwen + Fish tokens)
 data_prep/            speaker map/tokens, quality tokens, kept sentences, sentence-level ECAPA2 check, Gemini text export
 configs/tags_spec.json   the tag vocabulary and tagging rules
-run_train.sh          the training command used for v0
+run_train.sh          the training command of the first release (v0)
 ```
 
 **Setup:**
@@ -90,18 +81,23 @@ run_train.sh          the training command used for v0
   The codec weights (`codec.pth`) come from the `fishaudio/drama-3` model on Hugging Face, under the Fish Audio license.
 - OmniVoice weights: `k2-fsa/OmniVoice` on Hugging Face.
 
-**Inference:**
+**Inference** with the released weights (`model.safetensors` from Hugging Face):
 
 ```
-python ogg_tts/infer_omnifish.py --ckpt step20000.pt \
+huggingface-cli download FashionFlora/ogg-tts model.safetensors --local-dir .
+python ogg_tts/infer_omnifish.py --ckpt model.safetensors \
   --prompt-tokens prompt.npy:0:120 --prompt-text "Text of the prompt." \
-  --text "[sighing] Text to speak." --lang en --out out.wav
+  --text "[sighing] Text to speak." --lang en --cfg 1.5 --out out.wav
 ```
 
-**Dialogue with known speakers:**
+`prompt.npy` holds the Fish codes of the reference audio (`ogg_tts/encode_tokens.py`, or `fish_codec.encode`).
+
+**A line of dialogue with its context** (the neighbouring lines are not spoken, they set the delivery):
 
 ```
---speaker dialogue --text "<|quad_start|>pl_17<|quad_end|>Słyszałeś to? <|quad_start|>pl_23<|quad_end|>Nic nie słyszałem."
+python ogg_tts/infer_omnifish.py --ckpt model.safetensors --prompt-tokens voice.npy:0:180 --prompt-text "..." \
+  --before "Where were you last night?" --text "[frustrated] I told you already. I was at work." \
+  --after "At three in the morning?" --lang en --out line.wav
 ```
 
 ## Licenses and responsible use
@@ -111,4 +107,4 @@ python ogg_tts/infer_omnifish.py --ckpt step20000.pt \
   the model's audio output depends on that codec.
 - **Do not clone or imitate the voice of a real person without their consent.** No deceptive impersonation, no fraud,
   no sexual content involving minors.
-- The training data contains copyrighted recordings. The released weights are intended for research.
+- The released weights are intended for research.
