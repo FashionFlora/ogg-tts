@@ -99,7 +99,7 @@ footer { margin-top: 56px; padding: 28px 0 48px; border-top: 1px solid var(--lin
       <a class="btn" href="https://huggingface.co/FashionFlora/ogg-tts">🤗 Model</a>
       <a class="btn" href="https://github.com/FashionFlora/ogg-tts">GitHub</a>
     </div>
-    <div class="status">Preview: checkpoint 430k of a pre-training run that ended at 440k steps. Built with Fish Audio.</div>
+    <div class="status">Preview: checkpoint 430k of a pre-training run that ended at 440k steps (evaluation below). The samples and the playground still use checkpoint 120k, which is steadier without a voice prompt. Built with Fish Audio.</div>
   </div>
 </header>
 
@@ -272,7 +272,7 @@ footer { margin-top: 56px; padding: 28px 0 48px; border-top: 1px solid var(--lin
 
 <section id="samples">
   <h2>Samples</h2>
-  <p class="sub">Checkpoint 430k, <code>cfg=1.5</code>, no voice prompt: the voices are the model's own. Every language has its own texts. Each item was generated several times; the take shown first was selected with Whisper (language identification and transcript), the other takes are under each sample.</p>
+  <p class="sub">Checkpoint 120k, <code>cfg=1.5</code>, no voice prompt: the voices are the model's own. Every language has its own texts. Each item was generated 3 times; the take shown first was selected with Whisper (language identification and transcript), the other takes are under each sample.</p>
   <div class="tabs" id="langtabs" role="tablist" aria-label="Language"></div>
   <h3 id="lines-h">Lines</h3>
   <div class="two" id="langsamples"></div>
