@@ -99,7 +99,7 @@ footer { margin-top: 56px; padding: 28px 0 48px; border-top: 1px solid var(--lin
       <a class="btn" href="https://huggingface.co/FashionFlora/ogg-tts">🤗 Model</a>
       <a class="btn" href="https://github.com/FashionFlora/ogg-tts">GitHub</a>
     </div>
-    <div class="status">Preview: checkpoint 120k of a 400k-step pre-training run, still in progress. Built with Fish Audio.</div>
+    <div class="status">Preview: checkpoint 430k of a pre-training run that ended at 440k steps. Built with Fish Audio.</div>
   </div>
 </header>
 
@@ -265,14 +265,14 @@ footer { margin-top: 56px; padding: 28px 0 48px; border-top: 1px solid var(--lin
       <tr><td>Codec</td><td>Fish Audio Drama 3 / S2: 44.1 kHz, 21.5 frames/s, 1 semantic codebook (4096) + 9 residual (1024)</td></tr>
       <tr><td>Block</td><td>16 frames = 0.74 s</td></tr>
       <tr><td>Decoding</td><td>6 unmasking iterations with classifier-free guidance, then 9 MTP steps, per block; KV cache</td></tr>
-      <tr><td>Training</td><td>about 8,200 h of studio-quality speech in 8 languages (a private collection), 1× RTX PRO 6000, 400k steps planned</td></tr>
+      <tr><td>Training</td><td>about 8,200 h of studio-quality speech in 8 languages (a private collection), 1× RTX PRO 6000, 440k steps</td></tr>
     </table>
   </div>
 </section>
 
 <section id="samples">
   <h2>Samples</h2>
-  <p class="sub">Checkpoint 120k, <code>cfg=1.5</code>, no voice prompt: the voices are the model's own. Every language has its own texts. Each item was generated 3 times; the take shown first was selected with Whisper (language identification and transcript), the other takes are under each sample.</p>
+  <p class="sub">Checkpoint 430k, <code>cfg=1.5</code>, no voice prompt: the voices are the model's own. Every language has its own texts. Each item was generated several times; the take shown first was selected with Whisper (language identification and transcript), the other takes are under each sample.</p>
   <div class="tabs" id="langtabs" role="tablist" aria-label="Language"></div>
   <h3 id="lines-h">Lines</h3>
   <div class="two" id="langsamples"></div>
@@ -287,16 +287,16 @@ footer { margin-top: 56px; padding: 28px 0 48px; border-top: 1px solid var(--lin
 
 <section id="evaluation">
   <h2>Evaluation</h2>
-  <p class="sub">Checkpoint 120k, <code>cfg=1.5</code>, one sample per item. WER with Whisper large-v3-turbo, speaker similarity with ECAPA2 (cosine), pitch variation as F0 standard deviation in semitones.</p>
+  <p class="sub">Checkpoint 430k, <code>cfg=1.5</code>, one sample per item. WER with Whisper large-v3-turbo, speaker similarity with ECAPA2 (cosine), pitch variation as F0 standard deviation in semitones.</p>
   <h3>Held-out recordings</h3>
   <p class="sub">136 validation items in English, Spanish and German. Recordings and texts were never trained on. Each item clones a voice from a 6–10 s prompt and speaks two sentences that also exist as a real recording (passed through the same codec as the reference).</p>
   <div class="tablewrap">
     <table>
-      <tr><th></th><th class="num">OGG TTS 120k</th><th class="num">Real recording</th></tr>
-      <tr><td>WER</td><td class="num"><b>1.4 %</b></td><td class="num">2.6 %</td></tr>
-      <tr><td>Speaker similarity to the prompt</td><td class="num"><b>0.773</b></td><td class="num">0.737</td></tr>
-      <tr><td>Duration vs. the real recording (median)</td><td class="num">0.99</td><td class="num">1.00</td></tr>
-      <tr><td>Pitch variation (F0 std, semitones)</td><td class="num">3.58</td><td class="num">4.25</td></tr>
+      <tr><th></th><th class="num">OGG TTS 430k</th><th class="num">Real recording</th></tr>
+      <tr><td>WER</td><td class="num"><b>1.2 %</b></td><td class="num">2.6 %</td></tr>
+      <tr><td>Speaker similarity to the prompt</td><td class="num"><b>0.798</b></td><td class="num">0.737</td></tr>
+      <tr><td>Duration vs. the real recording (median)</td><td class="num">0.98</td><td class="num">1.00</td></tr>
+      <tr><td>Pitch variation (F0 std, semitones)</td><td class="num">3.90</td><td class="num">4.25</td></tr>
     </table>
   </div>
   <h3>All 8 languages</h3>
@@ -304,11 +304,11 @@ footer { margin-top: 56px; padding: 28px 0 48px; border-top: 1px solid var(--lin
   <div class="tablewrap">
     <table>
       <tr><th></th><th class="num">EN</th><th class="num">PL</th><th class="num">ES</th><th class="num">DE</th><th class="num">RU</th><th class="num">FR</th><th class="num">PT</th><th class="num">IT</th></tr>
-      <tr><td>WER</td><td class="num">0.0 %</td><td class="num">0.8 %</td><td class="num">0.0 %</td><td class="num">0.0 %</td><td class="num">0.0 %</td><td class="num">0.0 %</td><td class="num">3.3 %</td><td class="num">6.7 %</td></tr>
-      <tr><td>Similarity</td><td class="num">0.780</td><td class="num">0.767</td><td class="num">0.828</td><td class="num">0.824</td><td class="num">0.763</td><td class="num">0.708</td><td class="num">0.771</td><td class="num">0.841</td></tr>
+      <tr><td>WER</td><td class="num">0.0 %</td><td class="num">1.7 %</td><td class="num">0.0 %</td><td class="num">0.0 %</td><td class="num">0.0 %</td><td class="num">0.0 %</td><td class="num">3.3 %</td><td class="num">0.0 %</td></tr>
+      <tr><td>Similarity</td><td class="num">0.771</td><td class="num">0.785</td><td class="num">0.843</td><td class="num">0.797</td><td class="num">0.756</td><td class="num">0.765</td><td class="num">0.774</td><td class="num">0.862</td></tr>
     </table>
   </div>
-  <p class="note">The pace matches real speech. Intonation is still about 15 % flatter than in the real recordings; this is the main open point for the rest of the run. Public benchmarks (Seed-TTS, CV3) follow with the final checkpoint.</p>
+  <p class="note">The pace matches real speech. Intonation is still about 8 % flatter than in the real recordings (pitch variation 3.90 vs. 4.25 semitones); this is the main open point. Public benchmarks (Seed-TTS, CV3) follow.</p>
 </section>
 
 <section id="usage">

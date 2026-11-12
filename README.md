@@ -5,10 +5,10 @@
 OGG TTS is named after the trolls of *The Witcher*. Its planned siblings are **ROGG** and **POGG**: the three
 architectures compared in the technical report. Like its namesakes, OGG talks a lot.
 
-- Model weights and model card: https://huggingface.co/FashionFlora/ogg-tts (current release: checkpoint 120k).
+- Model weights and model card: https://huggingface.co/FashionFlora/ogg-tts (current release: checkpoint 430k).
 - Project page (architecture, samples, evaluation): https://fashionflora.github.io/ogg-tts/
 - Playground: https://huggingface.co/spaces/FashionFlora/ogg-tts
-- Status: pre-training in progress (400k steps planned).
+- Status: pre-training ended at 440k steps; checkpoint 430k is released.
 
 Built with Fish Audio.
 
